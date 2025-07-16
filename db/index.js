@@ -1,16 +1,15 @@
 const { Pool } = require('pg');
 
 const pool = new Pool({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD,
-  port: process.env.DB_PORT,
+  connectionString: process.env.DATABASE_URL, // Use Render's full URL
+  ssl: {
+    rejectUnauthorized: false // Required for Render's external PostgreSQL
+  }
 });
 
+// Test connection
 pool.query('SELECT NOW()')
-  .then(res => console.log('Database connected at:', res.rows[0].now))
-  .catch(err => console.error('Database connection error:', err));
-
+  .then(res => console.log('✅ Database connected at:', res.rows[0].now))
+  .catch(err => console.error('❌ Database connection error:', err));
 
 module.exports = pool;
