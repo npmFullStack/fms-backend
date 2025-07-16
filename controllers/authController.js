@@ -1,56 +1,88 @@
-const User = require('../models/User');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
+const User = require("../models/User");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
 
 const loginUser = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    
-    // Find user
-    const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ error: 'Invalid credentials' });
+    try {
+        const { email, password } = req.body;
 
-    // Check password
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ error: 'Invalid credentials' });
+        if (!email || !password) {
+            return res.status(400).json({ error: "Please provide email and password" });
+        }
 
-    // Create token
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: '1h'
-    });
+        // Find user
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(400).json({ error: "Invalid credentials" });
+        }
 
-    res.json({ token, user: { id: user._id, email: user.email } });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+        // Check password
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ error: "Invalid credentials" });
+        }
+
+        // Create token
+        const token = jwt.sign(
+            { id: user.id, email: user.email, username: user.username },
+            process.env.JWT_SECRET,
+            { expiresIn: "1h" }
+        );
+
+        res.json({
+            token,
+            user: {
+                id: user.id,
+                email: user.email,
+                username: user.username
+            }
+        });
+    } catch (error) {
+        console.error("Login error:", error);
+        res.status(500).json({ error: "Server error during login" });
+    }
 };
 
 const registerUser = async (req, res) => {
-  try {
-    const { email, password } = req.body;
+    try {
+        const { username, email, password } = req.body;
 
-    // Check if user exists
-    let user = await User.findOne({ email });
-    if (user) return res.status(400).json({ error: 'User already exists' });
+        if (!username || !email || !password) {
+            return res.status(400).json({ error: "Please provide all fields" });
+        }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+        // Check if user exists
+        let user = await User.findOne({ email });
+        if (user) {
+            return res.status(400).json({ error: "User already exists" });
+        }
 
-    // Create user
-    user = await User.create({ email, password: hashedPassword });
+        // Hash password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Create token
-    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, {
-      expiresIn: '1h',
-    });
+        // Create user
+        user = await User.create({ username, email, password: hashedPassword });
 
-    res.status(201).json({ token, user: { id: user.id, email: user.email } });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: error.message });
-  }
+        // Create token
+        const token = jwt.sign(
+            { id: user.id, email: user.email, username: user.username },
+            process.env.JWT_SECRET,
+            { expiresIn: "1h" }
+        );
+
+        res.status(201).json({
+            token,
+            user: {
+                id: user.id,
+                email: user.email,
+                username: user.username
+            }
+        });
+    } catch (error) {
+        console.error("Registration error:", error);
+        res.status(500).json({ error: "Server error during registration" });
+    }
 };
-
 
 module.exports = { loginUser, registerUser };
