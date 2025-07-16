@@ -3,10 +3,8 @@ const pool = require('../db');
 class User {
   static async findOne({ email }) {
     try {
-      console.log('Searching for user with email:', email);
       const query = 'SELECT * FROM users WHERE email = $1';
       const { rows } = await pool.query(query, [email]);
-      console.log('User search result:', rows[0]);
       return rows[0];
     } catch (err) {
       console.error('Error in User.findOne:', err);
@@ -14,12 +12,14 @@ class User {
     }
   }
 
-  static async create({ email, password }) {
+  static async create({ username, email, password }) {
     try {
-      console.log('Creating user with email:', email);
-      const query = 'INSERT INTO users(email, password) VALUES($1, $2) RETURNING *';
-      const { rows } = await pool.query(query, [email, password]);
-      console.log('User created:', rows[0]);
+      const query = `
+        INSERT INTO users(username, email, password) 
+        VALUES($1, $2, $3) 
+        RETURNING id, username, email
+      `;
+      const { rows } = await pool.query(query, [username, email, password]);
       return rows[0];
     } catch (err) {
       console.error('Error in User.create:', err);
