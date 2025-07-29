@@ -1,170 +1,78 @@
-const jwt = require("jsonwebtoken");
-const bcrypt = require("bcryptjs");
-const pool = require("../db"); // Assuming you have a db.js with PostgreSQL pool
+import { registerSchema, loginSchema } from "../schemas/authSchema.js";
+import { v4 as uuidv4 } from "uuid";
+import { findUserByEmail, createUser, findUserById } from "../models/User.js";
+import { hashPassword, comparePassword } from "../utils/passwordUtils.js";
+import { generateToken } from "../utils/jwtGenerator.js";
 
-const loginUser = async (req, res) => {
+export const registerUser = async (req, res) => {
     try {
-        const { email, password } = req.body;
+        // Validate request body with Zod
+        registerSchema.parse(req.body);
 
-        // Validation
-        if (!email || !password) {
-            return res.status(400).json({ 
-                success: false,
-                error: "Please provide email and password" 
-            });
-        }
-
-        // Find user in PostgreSQL
-        const userQuery = await pool.query(
-            'SELECT * FROM users WHERE email = $1',
-            [email]
-        );
-        
-        if (userQuery.rows.length === 0) {
-            return res.status(400).json({ 
-                success: false,
-                error: "Invalid credentials" 
-            });
-        }
-
-        const user = userQuery.rows[0];
-
-        // Check password
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) {
-            return res.status(400).json({ 
-                success: false,
-                error: "Invalid credentials" 
-            });
-        }
-
-        // Create token payload
-        const tokenPayload = {
-            id: user.id, // PostgreSQL uses 'id' not '_id'
-            email: user.email,
-            username: user.username
-        };
-
-        // Create token
-        const token = jwt.sign(
-            tokenPayload,
-            process.env.JWT_SECRET,
-            { expiresIn: "1h" }
-        );
-
-        // Prepare response data
-        const userData = {
-            id: user.id,
-            email: user.email,
-            username: user.username
-        };
-
-        res.json({
-            success: true,
-            token,
-            user: userData
-        });
-    } catch (error) {
-        console.error("Login error:", error);
-        res.status(500).json({ 
-            success: false,
-            error: "Server error during login" 
-        });
-    }
-};
-
-const registerUser = async (req, res) => {
-    try {
         const { username, email, password } = req.body;
 
-        // Validation
-        if (!username || !email || !password) {
-            return res.status(400).json({ 
-                success: false,
-                error: "Please provide all fields" 
-            });
+        const existing = await findUserByEmail(email);
+        if (existing.rows.length > 0) {
+            return res
+                .status(400)
+                .json({ message: "Email already registered" });
         }
 
-        // Check if user exists in PostgreSQL
-        const existingUser = await pool.query(
-            'SELECT * FROM users WHERE email = $1',
-            [email]
-        );
-        
-        if (existingUser.rows.length > 0) {
-            return res.status(400).json({ 
-                success: false,
-                error: "User already exists" 
-            });
-        }
+        const hashedPassword = await hashPassword(password);
+        const userId = uuidv4();
 
-        // Hash password
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(password, salt);
-
-        // Create user in PostgreSQL
-        const newUser = await pool.query(
-            'INSERT INTO users (username, email, password) VALUES ($1, $2, $3) RETURNING *',
-            [username, email, hashedPassword]
-        );
-
-        const user = newUser.rows[0];
-
-        // Create token payload
-        const tokenPayload = {
-            id: user.id,
-            email: user.email,
-            username: user.username
-        };
-
-        // Create token
-        const token = jwt.sign(
-            tokenPayload,
-            process.env.JWT_SECRET,
-            { expiresIn: "1h" }
-        );
-
-        // Prepare response data
-        const userData = {
-            id: user.id,
-            email: user.email,
-            username: user.username
-        };
-
-        res.status(201).json({
-            success: true,
-            token,
-            user: userData
-        });
+        await createUser(userId, username, email, hashedPassword);
+        res.json({ message: "User registered successfully" });
     } catch (error) {
-        console.error("Registration error:", error);
-        res.status(500).json({ 
-            success: false,
-            error: "Server error during registration" 
-        });
+        // Send validation errors from Zod or general server error
+        if (error.errors) {
+            return res.status(400).json({ message: error.errors[0].message });
+        }
+        res.status(500).json({ message: "Server error" });
     }
 };
 
-const getMe = async (req, res) => {
+export const loginUser = async (req, res) => {
     try {
-        // User is already attached to req by authMiddleware
-        const userData = {
-            id: req.user.id, // PostgreSQL uses 'id'
-            email: req.user.email,
-            username: req.user.username
-        };
+        loginSchema.parse(req.body);
 
-        res.json({
-            success: true,
-            user: userData
+        const { email, password } = req.body;
+        const user = await findUserByEmail(email);
+
+        if (user.rows.length === 0) {
+            return res.status(400).json({ message: "User not found" });
+        }
+
+        const validPass = await comparePassword(
+            password,
+            user.rows[0].password
+        );
+        if (!validPass) {
+            return res.status(400).json({ message: "Invalid password" });
+        }
+
+        const token = generateToken({
+            id: user.rows[0].id,
+            email: user.rows[0].email
         });
+
+        res.json({ message: "Login successful", token });
     } catch (error) {
-        console.error("GetMe error:", error);
-        res.status(500).json({ 
-            success: false,
-            error: "Server error fetching user data" 
-        });
+        if (error.errors) {
+            return res.status(400).json({ message: error.errors[0].message });
+        }
+        res.status(500).json({ message: "Server error" });
     }
 };
 
-module.exports = { loginUser, registerUser, getMe };
+export const getProfile = async (req, res) => {
+    try {
+        const user = await findUserById(req.user.id);
+        if (!user.rows.length) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        res.json({user: user.rows[0]});
+    } catch (error) {
+        res.status(500).json({message: "Server Error"});
+    }
+};

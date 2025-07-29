@@ -1,31 +1,19 @@
-const pool = require('../db');
+import { pool } from "../db/index.js";
 
-class User {
-  static async findOne({ email }) {
-    try {
-      const query = 'SELECT * FROM users WHERE email = $1';
-      const { rows } = await pool.query(query, [email]);
-      return rows[0];
-    } catch (err) {
-      console.error('Error in User.findOne:', err);
-      throw err;
-    }
-  }
+export const findUserByEmail = async email => {
+    return await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+};
 
-  static async create({ username, email, password }) {
-    try {
-      const query = `
-        INSERT INTO users(username, email, password) 
-        VALUES($1, $2, $3) 
-        RETURNING id, username, email
-      `;
-      const { rows } = await pool.query(query, [username, email, password]);
-      return rows[0];
-    } catch (err) {
-      console.error('Error in User.create:', err);
-      throw err;
-    }
-  }
-}
+export const createUser = async (id, username, email, hashedPassword) => {
+    return await pool.query(
+        "INSERT INTO users (id, username, email, password) VALUES ($1, $2, $3, $4)",
+        [id, username, email, hashedPassword]
+    );
+};
 
-module.exports = User;
+export const findUserById = async id => {
+    return await pool.query(
+        "SELECT id, username, email FROM users WHERE id = $1",
+        [id]
+    );
+};
