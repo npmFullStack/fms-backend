@@ -1,14 +1,17 @@
-const express = require('express');
-const router = express.Router();
-const { 
-    loginUser, 
+import express from "express";
+import {
     registerUser,
-    getMe 
-} = require('../controllers/authController');
-const authMiddleware = require('../middlewares/authMiddleware');
+    loginUser,
+    getProfile
+} from "../controllers/authController.js";
+import { verifyTokenMiddleware } from "../middleware/authMiddlewares.js";
 
-router.post('/register', registerUser);
-router.post('/login', loginUser);
-router.get('/me', authMiddleware, getMe); // Add this endpoint
+const router = express.Router();
 
-module.exports = router;
+router.post("/register", registerUser);
+router.post("/login", loginUser);
+
+// ✅ Protected route example
+router.get("/profile", verifyTokenMiddleware, getProfile);
+
+export default router;

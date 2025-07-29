@@ -1,15 +1,23 @@
-const { Pool } = require('pg');
+import dotenv from "dotenv";
+import { Pool } from "pg";
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL, // Use Render's full URL
-  ssl: {
-    rejectUnauthorized: false // Required for Render's external PostgreSQL
-  }
+dotenv.config();
+
+export const pool = new Pool({
+    user: process.env.DB_USER,
+    host: process.env.DB_HOST,
+    database: process.env.DB_NAME,
+    password: process.env.DB_PASSWORD,
+    port: process.env.DB_PORT
 });
 
-// Test connection
-pool.query('SELECT NOW()')
-  .then(res => console.log('✅ Database connected at:', res.rows[0].now))
-  .catch(err => console.error('❌ Database connection error:', err));
+const testDbConnection = async () => {
+  try {
+    const res = await pool.query("SELECT NOW()");
+    console.log("Db connected:", res.rows[0].now);
+  } catch (err) {
+    console.error("Database connection error:", err);
+  }
+};
 
-module.exports = pool;
+testDbConnection();
