@@ -5,31 +5,27 @@ import { hashPassword, comparePassword } from "../utils/passwordUtils.js";
 import { generateToken } from "../utils/jwtGenerator.js";
 
 export const registerUser = async (req, res) => {
-    try {
-        // Validate request body with Zod
-        registerSchema.parse(req.body);
+  try {
+    registerSchema.parse(req.body);
 
-        const { username, email, password } = req.body;
+    const { firstName, lastName, email, password } = req.body;
 
-        const existing = await findUserByEmail(email);
-        if (existing.rows.length > 0) {
-            return res
-                .status(400)
-                .json({ message: "Email already registered" });
-        }
-
-        const hashedPassword = await hashPassword(password);
-        const userId = uuidv4();
-
-        await createUser(userId, username, email, hashedPassword);
-        res.json({ message: "User registered successfully" });
-    } catch (error) {
-        // Send validation errors from Zod or general server error
-        if (error.errors) {
-            return res.status(400).json({ message: error.errors[0].message });
-        }
-        res.status(500).json({ message: "Server error" });
+    const existing = await findUserByEmail(email);
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ message: "Email already registered" });
     }
+
+    const hashedPassword = await hashPassword(password);
+    const userId = uuidv4();
+
+    await createUser(userId, firstName, lastName, email, hashedPassword);
+    res.json({ message: "User registered successfully" });
+  } catch (error) {
+    if (error.errors) {
+      return res.status(400).json({ message: error.errors[0].message });
+    }
+    res.status(500).json({ message: "Server error" });
+  }
 };
 
 export const loginUser = async (req, res) => {
