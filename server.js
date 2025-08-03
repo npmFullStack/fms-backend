@@ -6,9 +6,17 @@ import authRoutes from "./routes/authRoutes.js";
 dotenv.config();
 
 const app = express();
-app.use(cors());
-app.use(express.json());
 
+// Configure CORS properly
+app.use(cors({
+  origin: [
+    'http://localhost:3000', // For local development
+    'https://your-vercel-app.vercel.app' // Replace with your actual Vercel URL
+  ],
+  credentials: true
+}));
+
+app.use(express.json());
 app.use("/api/auth", authRoutes);
 
 const PORT = process.env.PORT || 5000;
