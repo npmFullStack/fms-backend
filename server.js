@@ -9,17 +9,17 @@ const app = express();
 
 // Configure CORS properly
 app.use(
-    cors({
-        origin: [
-            "http://localhost:3000", // For local development
-            "https://fms-azure.vercel.app" // Replace with your actual Vercel URL
-        ],
-        credentials: true
-    })
+  cors({
+    origin: [
+      "http://localhost:3000",
+      "https://fms-azure.vercel.app"
+    ],
+    credentials: true
+  })
 );
 
 app.use(express.json());
-app.use("/api/auth", authRoutes);
+app.use("/auth", authRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
