@@ -4,9 +4,12 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "start": "nodemon server.js",
-    "dev": "nodemon server.js",
-    "migrate": "node ./migrations/create-tables.js"
+   "start": "nodemon server.js",
+  "dev": "cp .env.local .env && nodemon server.js",
+  "migrate": "node ./migrations/create-tables.js",
+  "reset-db": "node ./migrations/reset-db.js",
+  "fresh-db": "npm run reset-db && npm run migrate",
+  "restore-prod-env": "git checkout -- .env"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
