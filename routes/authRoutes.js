@@ -2,7 +2,8 @@ import express from "express";
 import {
     registerUser,
     loginUser,
-    getProfile
+    getProfile,
+    fetchUsers
 } from "../controllers/authController.js";
 import { verifyTokenMiddleware } from "../middleware/authMiddlewares.js";
 
@@ -13,5 +14,6 @@ router.post("/login", loginUser);
 
 // ✅ Protected route example
 router.get("/profile", verifyTokenMiddleware, getProfile);
+router.get("/users", verifyTokenMiddleware, fetchUsers);
 
 export default router;
