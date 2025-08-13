@@ -1,31 +1,38 @@
 import { registerSchema, loginSchema } from "../schemas/authSchema.js";
 import { v4 as uuidv4 } from "uuid";
-import { findUserByEmail, createUser, findUserById, getAllUsers } from "../models/User.js";
+import {
+    findUserByEmail,
+    createUser,
+    findUserById,
+    getAllUsers
+} from "../models/User.js";
 import { hashPassword, comparePassword } from "../utils/passwordUtils.js";
 import { generateToken } from "../utils/jwtGenerator.js";
 
 export const registerUser = async (req, res) => {
-  try {
-    registerSchema.parse(req.body);
+    try {
+        registerSchema.parse(req.body);
 
-    const { firstName, lastName, email, password } = req.body;
+        const { firstName, lastName, email, password } = req.body;
 
-    const existing = await findUserByEmail(email);
-    if (existing.rows.length > 0) {
-      return res.status(400).json({ message: "Email already registered" });
+        const existing = await findUserByEmail(email);
+        if (existing.rows.length > 0) {
+            return res
+                .status(400)
+                .json({ message: "Email already registered" });
+        }
+
+        const hashedPassword = await hashPassword(password);
+        const userId = uuidv4();
+
+        await createUser(userId, firstName, lastName, email, hashedPassword);
+        res.json({ message: "User registered successfully" });
+    } catch (error) {
+        if (error.errors) {
+            return res.status(400).json({ message: error.errors[0].message });
+        }
+        res.status(500).json({ message: "Server error" });
     }
-
-    const hashedPassword = await hashPassword(password);
-    const userId = uuidv4();
-
-    await createUser(userId, firstName, lastName, email, hashedPassword);
-    res.json({ message: "User registered successfully" });
-  } catch (error) {
-    if (error.errors) {
-      return res.status(400).json({ message: error.errors[0].message });
-    }
-    res.status(500).json({ message: "Server error" });
-  }
 };
 
 export const loginUser = async (req, res) => {
@@ -67,17 +74,32 @@ export const getProfile = async (req, res) => {
         if (!user.rows.length) {
             return res.status(404).json({ message: "User not found" });
         }
-        res.json({user: user.rows[0]});
+        res.json({ user: user.rows[0] });
     } catch (error) {
-        res.status(500).json({message: "Server Error"});
+        res.status(500).json({ message: "Server Error" });
     }
 };
 
+// Add this new endpoint
+export const uploadProfilePicture = async (req, res) => {
+    try {
+        const { imageUrl } = req.body;
+        await updateProfilePicture(req.user.id, imageUrl);
+
+        const user = await findUserById(req.user.id);
+        res.json({ user: user.rows[0] });
+    } catch (error) {
+        res.status(500).json({ message: "Error updating profile picture" });
+    }
+};
+
+
+
 export const fetchUsers = async (req, res) => {
-  try {
-    const users = await getAllUsers();
-    res.json(users);
-  } catch (err) {
-    res.status(500).json({ error: "Server error" });
-  }
-}
+    try {
+        const users = await getAllUsers();
+        res.json(users);
+    } catch (err) {
+        res.status(500).json({ error: "Server error" });
+    }
+};
