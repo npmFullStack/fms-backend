@@ -1,6 +1,6 @@
 import { registerSchema, loginSchema } from "../schemas/authSchema.js";
 import { v4 as uuidv4 } from "uuid";
-import { findUserByEmail, createUser, findUserById } from "../models/User.js";
+import { findUserByEmail, createUser, findUserById, getAllUsers } from "../models/User.js";
 import { hashPassword, comparePassword } from "../utils/passwordUtils.js";
 import { generateToken } from "../utils/jwtGenerator.js";
 
@@ -72,3 +72,12 @@ export const getProfile = async (req, res) => {
         res.status(500).json({message: "Server Error"});
     }
 };
+
+export const fetchUsers = async (req, res) => {
+  try {
+    const users = await getAllUsers();
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+}
