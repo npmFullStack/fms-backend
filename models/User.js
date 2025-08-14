@@ -45,7 +45,9 @@ export const createUser = async (
   lastName,
   email,
   hashedPassword,
-  role = "customer"
+  role = "customer",
+  phone = null,
+  profile_picture = null
 ) => {
   await pool.query("BEGIN");
   try {
@@ -54,9 +56,9 @@ export const createUser = async (
       [id, email, hashedPassword, role]
     );
     await pool.query(
-      `INSERT INTO user_details (user_id, first_name, last_name)
-       VALUES ($1, $2, $3)`,
-      [id, firstName, lastName]
+      `INSERT INTO user_details (user_id, first_name, last_name, phone, profile_picture) 
+       VALUES ($1, $2, $3, $4, $5)`,
+      [id, firstName, lastName, phone, profile_picture]
     );
     await pool.query("COMMIT");
   } catch (error) {
@@ -64,6 +66,7 @@ export const createUser = async (
     throw error;
   }
 };
+
 
 // User management: update user
 export const updateUserById = async (id, firstName, lastName, email, role) => {
