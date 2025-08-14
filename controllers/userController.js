@@ -12,18 +12,19 @@ import { hashPassword } from "../utils/passwordUtils.js";
 export const addUser = async (req, res) => {
   try {
     addUserSchema.parse(req.body);
-    const { first_name, last_name, email, password, role } = req.body;
-    
-    // Check if user already exists
+
+    const { firstName, lastName, email, password, role, phone, profile_picture } = req.body;
+
     const existing = await findUserByEmail(email);
     if (existing.rows.length > 0) {
       return res.status(400).json({ message: "Email already exists" });
     }
-    
+
     const hashedPassword = await hashPassword(password);
     const userId = uuidv4();
-    
-    await createUser(userId, first_name, last_name, email, hashedPassword, role);
+
+    await createUser(userId, firstName, lastName, email, hashedPassword, role, phone, profile_picture);
+
     res.json({ message: "User created successfully" });
   } catch (error) {
     if (error.errors) {
@@ -33,6 +34,7 @@ export const addUser = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 export const getUsers = async (req, res) => {
   try {
