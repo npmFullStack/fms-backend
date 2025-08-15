@@ -20,27 +20,37 @@ export const addUser = async (req, res) => {
     let publicId = null;
 
     try {
+        console.log("Request file:", req.file); // Debug log
+        console.log("Request body:", req.body); // Debug log
+
         // Handle image upload to Cloudinary
         if (req.file) {
+            console.log("Uploading file to Cloudinary...");
             const result = await uploadToCloudinary(req.file.buffer);
             profilePictureUrl = result.secure_url;
             publicId = result.public_id;
+            console.log("Upload successful. URL:", profilePictureUrl);
         }
 
-        // Parse form data
+        // Parse form data - ensure field names match frontend
         const userData = {
             firstName: req.body.firstName,
             lastName: req.body.lastName,
-            email: req.body.email,
-            password: req.body.password,
+            email:
+                req.body.email ||
+                `${req.body.firstName.toLowerCase()}.${req.body.lastName.toLowerCase()}@example.com`,
+            password: req.body.password || "password",
             role: req.body.role,
             phone: req.body.phone || null,
             profile_picture: profilePictureUrl
         };
 
+        console.log("Processed user data:", userData); // Debug log
+
         // Validate the data
         addUserSchema.parse(userData);
 
+        // Check for existing user
         const existing = await findUserByEmail(userData.email);
         if (existing.rows.length > 0) {
             if (publicId) {
@@ -49,9 +59,11 @@ export const addUser = async (req, res) => {
             return res.status(400).json({ message: "Email already exists" });
         }
 
+        // Hash password
         const hashedPassword = await hashPassword(userData.password);
         const userId = uuidv4();
 
+        // Create user in database
         await createUser(
             userId,
             userData.firstName,
@@ -63,18 +75,33 @@ export const addUser = async (req, res) => {
             userData.profile_picture
         );
 
-        res.json({ message: "User created successfully" });
+        res.json({
+            message: "User created successfully",
+            user: {
+                id: userId,
+                ...userData,
+                profile_picture: userData.profile_picture
+            }
+        });
     } catch (error) {
+        console.error("Error in addUser:", error); // Detailed error log
+
         // Clean up uploaded image if there's an error
         if (publicId) {
             await deleteFromCloudinary(publicId);
         }
 
         if (error.errors) {
-            return res.status(400).json({ message: error.errors[0].message });
+            return res.status(400).json({
+                message: "Validation error",
+                errors: error.errors
+            });
         }
-        console.error("Error adding user:", error);
-        res.status(500).json({ message: "Server error" });
+
+        res.status(500).json({
+            message: "Server error",
+            error: error.message
+        });
     }
 };
 
