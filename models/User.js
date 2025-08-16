@@ -97,3 +97,20 @@ export const updateUserById = async (
   }
 };
 
+// Restrict (deactivate) a user
+export const restrictUserById = async (id) => {
+  return await pool.query(
+    `UPDATE users SET is_active = FALSE WHERE id = $1 RETURNING *`,
+    [id]
+  );
+};
+
+// Unrestrict (reactivate) a user
+export const unrestrictUserById = async (id) => {
+  return await pool.query(
+    `UPDATE users SET is_active = TRUE WHERE id = $1 RETURNING *`,
+    [id]
+  );
+};
+
+

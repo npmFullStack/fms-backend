@@ -38,25 +38,26 @@ export const loginUser = async (req, res) => {
   try {
     loginSchema.parse(req.body);
     const { email, password } = req.body;
-    
+
     const user = await findUserByEmail(email);
     if (user.rows.length === 0) {
       return res.status(400).json({ message: "User not found" });
     }
-    
-    const validPass = await comparePassword(
-      password,
-      user.rows[0].password
-    );
+
+    if (!user.rows[0].is_active) {
+      return res.status(403).json({ message: "Account is restricted. Contact admin." });
+    }
+
+    const validPass = await comparePassword(password, user.rows[0].password);
     if (!validPass) {
       return res.status(400).json({ message: "Invalid password" });
     }
-    
+
     const token = generateToken({
       id: user.rows[0].id,
       email: user.rows[0].email
     });
-    
+
     res.json({ message: "Login successful", token });
   } catch (error) {
     if (error.errors) {
@@ -65,6 +66,7 @@ export const loginUser = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
 
 export const getProfile = async (req, res) => {
   try {
