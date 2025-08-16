@@ -69,29 +69,31 @@ export const createUser = async (
 
 // User management: update user
 export const updateUserById = async (
-    id,
-    firstName,
-    lastName,
-    email,
-    role,
-    profilePicture = null
+  id,
+  firstName,
+  lastName,
+  email,
+  role,
+  profilePicture = null,
+  phone = null // ✅ add phone
 ) => {
-    await pool.query("BEGIN");
-    try {
-        await pool.query(
-            `UPDATE users SET email = $2, role = $3 WHERE id = $1`,
-            [id, email, role]
-        );
+  await pool.query("BEGIN");
+  try {
+    await pool.query(
+      `UPDATE users SET email = $2, role = $3 WHERE id = $1`,
+      [id, email, role]
+    );
 
-        // Include profile_picture in the update
-        await pool.query(
-            `UPDATE user_details SET first_name = $2, last_name = $3, profile_picture = $4 WHERE user_id = $1`,
-            [id, firstName, lastName, profilePicture]
-        );
+    await pool.query(
+      `UPDATE user_details SET first_name = $2, last_name = $3, profile_picture = $4, phone = $5
+       WHERE user_id = $1`,
+      [id, firstName, lastName, profilePicture, phone]
+    );
 
-        await pool.query("COMMIT");
-    } catch (error) {
-        await pool.query("ROLLBACK");
-        throw error;
-    }
+    await pool.query("COMMIT");
+  } catch (error) {
+    await pool.query("ROLLBACK");
+    throw error;
+  }
 };
+
