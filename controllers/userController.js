@@ -10,7 +10,9 @@ import {
     findUserById,
     findUserByEmail,
     createUser,
-    updateUserById
+    updateUserById,
+    restrictUserById,
+    unrestrictUserById
 } from "../models/User.js";
 import { addUserSchema, updateUserSchema } from "../schemas/userSchema.js";
 import { hashPassword, comparePassword } from "../utils/passwordUtils.js";
@@ -213,4 +215,37 @@ export const updateUser = async (req, res) => {
             error: error.message 
         });
     }
+};
+
+
+export const restrictUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await restrictUserById(id);
+
+    if (!result.rows.length) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({ message: "User restricted successfully", user: result.rows[0] });
+  } catch (error) {
+    console.error("Error restricting user:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+export const unrestrictUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await unrestrictUserById(id);
+
+    if (!result.rows.length) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({ message: "User unrestricted successfully", user: result.rows[0] });
+  } catch (error) {
+    console.error("Error unrestricting user:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 };
