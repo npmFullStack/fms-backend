@@ -73,85 +73,97 @@ async function createTables() {
             )
         `);
 
-        // ==================== PARTNER TABLES ====================
-        // 5. Shipping partners
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS shipping_lines (
-                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                name VARCHAR(100) NOT NULL,
-                is_active BOOLEAN DEFAULT TRUE,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-        `);
+// ==================== ROUTES TABLE ====================
+await pool.query(`
+    CREATE TABLE IF NOT EXISTS routes (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        origin VARCHAR(100) NOT NULL,
+        destination VARCHAR(100) NOT NULL,
+        UNIQUE(origin, destination)
+    )
+`);
 
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS shipping_line_details (
-                shipping_line_id UUID PRIMARY KEY REFERENCES shipping_lines(id) ON DELETE CASCADE,
-                logo_url TEXT,
-                contact_email VARCHAR(100),
-                contact_phone VARCHAR(20),
-                website VARCHAR(255),
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-        `);
+// ==================== PARTNER TABLES ====================
+// 5. Shipping partners
+await pool.query(`
+    CREATE TABLE IF NOT EXISTS shipping_lines (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        name VARCHAR(100) NOT NULL,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+`);
 
-        // 6. Trucking partners
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS trucking_companies (
-                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                name VARCHAR(100) NOT NULL,
-                is_active BOOLEAN DEFAULT TRUE,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-        `);
+await pool.query(`
+    CREATE TABLE IF NOT EXISTS shipping_line_details (
+        shipping_line_id UUID PRIMARY KEY REFERENCES shipping_lines(id) ON DELETE CASCADE,
+        logo_url TEXT,
+        contact_email VARCHAR(100),
+        contact_phone VARCHAR(20),
+        website VARCHAR(255),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+`);
 
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS trucking_company_details (
-                trucking_company_id UUID PRIMARY KEY REFERENCES trucking_companies(id) ON DELETE CASCADE,
-                logo_url TEXT,
-                contact_email VARCHAR(100),
-                contact_phone VARCHAR(20),
-                service_routes TEXT[],
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-            )
-        `);
+// 6. Trucking partners
+await pool.query(`
+    CREATE TABLE IF NOT EXISTS trucking_companies (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        name VARCHAR(100) NOT NULL,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+`);
 
-        // ==================== PRICING TABLES ====================
-        // 7. Shipping pricing
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS container_pricing (
-                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                shipping_line_id UUID REFERENCES shipping_lines(id) ON DELETE CASCADE,
-                container_type container_type NOT NULL,
-                price DECIMAL(10,2) NOT NULL,
-                valid_from DATE NOT NULL DEFAULT CURRENT_DATE,
-                valid_to DATE,
-                is_active BOOLEAN DEFAULT TRUE,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                UNIQUE(shipping_line_id, container_type, valid_from)
-            )
-        `);
+await pool.query(`
+    CREATE TABLE IF NOT EXISTS trucking_company_details (
+        trucking_company_id UUID PRIMARY KEY REFERENCES trucking_companies(id) ON DELETE CASCADE,
+        logo_url TEXT,
+        contact_email VARCHAR(100),
+        contact_phone VARCHAR(20),
+        service_routes TEXT[],
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+`);
 
-        // 8. Trucking pricing
-        await pool.query(`
-            CREATE TABLE IF NOT EXISTS trucking_rates (
-                id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-                trucking_company_id UUID REFERENCES trucking_companies(id) ON DELETE CASCADE,
-                route VARCHAR(50) NOT NULL,
-                rate DECIMAL(10,2) NOT NULL,
-                valid_from DATE NOT NULL DEFAULT CURRENT_DATE,
-                valid_to DATE,
-                is_active BOOLEAN DEFAULT TRUE,
-                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                UNIQUE(trucking_company_id, route, valid_from)
-            )
-        `);
+// ==================== PRICING TABLES ====================
+// 7. Shipping pricing (now with route_id)
+await pool.query(`
+    CREATE TABLE IF NOT EXISTS container_pricing (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        shipping_line_id UUID REFERENCES shipping_lines(id) ON DELETE CASCADE,
+        route_id UUID REFERENCES routes(id) ON DELETE CASCADE,
+        container_type container_type NOT NULL,
+        price DECIMAL(10,2) NOT NULL,
+        valid_from DATE NOT NULL DEFAULT CURRENT_DATE,
+        valid_to DATE,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(shipping_line_id, route_id, container_type, valid_from)
+    )
+`);
+
+// 8. Trucking pricing (also uses route_id now)
+await pool.query(`
+    CREATE TABLE IF NOT EXISTS trucking_rates (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        trucking_company_id UUID REFERENCES trucking_companies(id) ON DELETE CASCADE,
+        route_id UUID REFERENCES routes(id) ON DELETE CASCADE,
+        rate DECIMAL(10,2) NOT NULL,
+        valid_from DATE NOT NULL DEFAULT CURRENT_DATE,
+        valid_to DATE,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(trucking_company_id, route_id, valid_from)
+    )
+`);
+
 
         // ==================== SALES/BOOKING TABLES ====================
         // 9. Bookings (sales)

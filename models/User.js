@@ -1,3 +1,5 @@
+// models/User.js
+
 import { pool } from "../db/index.js";
 
 // User management: get all users

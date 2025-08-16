@@ -1,3 +1,5 @@
+// schemas/userSchema.js
+
 import { z } from "zod";
 
 export const addUserSchema = z.object({
