@@ -4,7 +4,7 @@ import {
   getTruckingCompany,
   addTruckingCompany,
   editTruckingCompany,
-  toggleStatus,
+  deleteTruckingCompany,
 } from "../controllers/truckingCompanyController.js";
 import { verifyTokenMiddleware } from "../middleware/authMiddlewares.js";
 import { upload } from "../utils/imageUtils.js";
@@ -16,6 +16,7 @@ router.get("/", verifyTokenMiddleware, getTruckingCompanies);
 router.get("/:id", verifyTokenMiddleware, getTruckingCompany);
 router.post("/", verifyTokenMiddleware, upload.single("logo"), addTruckingCompany);
 router.put("/:id", verifyTokenMiddleware, upload.single("logo"), editTruckingCompany);
-router.patch("/:id/toggle-status", verifyTokenMiddleware, toggleStatus);
+router.delete("/:id", verifyTokenMiddleware, deleteTruckingCompany);
+
 
 export default router;

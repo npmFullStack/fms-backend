@@ -4,7 +4,7 @@ import {
     getTruckingCompanyById,
     createTruckingCompany,
     updateTruckingCompany,
-    toggleTruckingCompanyStatus
+    deleteTruckingCompanyById
 } from "../models/TruckingCompany.js";
 import { partnerSchema } from "../schemas/partnerSchema.js";
 import {
@@ -41,57 +41,29 @@ export const getTruckingCompany = async (req, res) => {
 };
 
 export const addTruckingCompany = async (req, res) => {
-    let logoUrl = null;
-    let publicId = null;
+  try {
+    const id = uuidv4();
 
-    try {
-        // Handle image upload if exists
-        if (req.file) {
-            const result = await uploadToCloudinary(req.file.buffer);
-            logoUrl = result.secure_url;
-            publicId = result.public_id;
-        }
+    // Insert partner first (without logo yet)
+    await createTruckingCompany(id, req.body.name, null);
 
-        const truckingCompanyData = {
-            name: req.body.name,
-            logoUrl: logoUrl
-        };
+    // Respond immediately
+    res.status(201).json({
+      message: "Trucking company created successfully",
+      truckingCompany: { id, name: req.body.name, logoUrl: null }
+    });
 
-        // Validate data
-        partnerSchema.parse(truckingCompanyData);
-
-        const id = uuidv4();
-        await createTruckingCompany(
-            id,
-            truckingCompanyData.name,
-            truckingCompanyData.logoUrl
-        );
-
-        res.status(201).json({
-            message: "Trucking company created successfully",
-            truckingCompany: { id, ...truckingCompanyData }
-        });
-    } catch (error) {
-        // Clean up uploaded image if error occurs
-        if (publicId) {
-            await deleteFromCloudinary(publicId);
-        }
-
-        console.error("Error creating trucking company:", error);
-
-        if (error.errors) {
-            return res.status(400).json({
-                message: "Validation error",
-                errors: error.errors
-            });
-        }
-
-        res.status(500).json({
-            message: "Server error",
-            error: error.message
-        });
+    // If logo exists → upload async and update DB
+    if (req.file) {
+      const result = await uploadToCloudinary(req.file.buffer);
+      await updateTruckingCompany(id, req.body.name, result.secure_url);
     }
+  } catch (error) {
+    console.error("Error creating trucking company:", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
 };
+
 
 export const editTruckingCompany = async (req, res) => {
     let logoUrl = null;
@@ -157,25 +129,18 @@ export const editTruckingCompany = async (req, res) => {
     }
 };
 
-export const toggleStatus = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const result = await toggleTruckingCompanyStatus(id);
+export const deleteTruckingCompany = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await deleteTruckingCompanyById(id);
 
-        if (!result.rows.length) {
-            return res
-                .status(404)
-                .json({ message: "Trucking company not found" });
-        }
-
-        res.json({
-            message: `Trucking company ${
-                result.rows[0].is_active ? "activated" : "deactivated"
-            }`,
-            truckingCompany: result.rows[0]
-        });
-    } catch (error) {
-        console.error("Error toggling trucking company status:", error);
-        res.status(500).json({ message: "Server error" });
+    if (!result.rowCount) {
+      return res.status(404).json({ message: "Trucking company not found" });
     }
+
+    res.json({ message: "Trucking company removed successfully" });
+  } catch (error) {
+    console.error("Error deleting trucking company:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 };

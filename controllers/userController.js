@@ -12,100 +12,91 @@ import {
     createUser,
     updateUserById,
     restrictUserById,
-    unrestrictUserById
+    unrestrictUserById,
+    updateUserProfilePicture
 } from "../models/User.js";
 import { addUserSchema, updateUserSchema } from "../schemas/userSchema.js";
 import { hashPassword, comparePassword } from "../utils/passwordUtils.js";
 
 export const addUser = async (req, res) => {
-    let profilePictureUrl = null;
-    let publicId = null;
+  let publicId = null;
 
-    try {
-        console.log("Request file:", req.file); // Debug log
-        console.log("Request body:", req.body); // Debug log
+  try {
+    const userId = uuidv4();
 
-        // Handle image upload to Cloudinary
-        if (req.file) {
-            console.log("Uploading file to Cloudinary...");
-            const result = await uploadToCloudinary(req.file.buffer);
-            profilePictureUrl = result.secure_url;
-            publicId = result.public_id;
-            console.log("Upload successful. URL:", profilePictureUrl);
-        }
+    // Parse form data (no profile picture yet)
+    const userData = {
+      firstName: req.body.firstName,
+      lastName: req.body.lastName,
+      email:
+        req.body.email ||
+        `${req.body.firstName.toLowerCase()}.${req.body.lastName.toLowerCase()}@example.com`,
+      password: req.body.password || "password",
+      role: req.body.role,
+      phone: req.body.phone || null,
+      profile_picture: null
+    };
 
-        // Parse form data - ensure field names match frontend
-        const userData = {
-            firstName: req.body.firstName,
-            lastName: req.body.lastName,
-            email:
-                req.body.email ||
-                `${req.body.firstName.toLowerCase()}.${req.body.lastName.toLowerCase()}@example.com`,
-            password: req.body.password || "password",
-            role: req.body.role,
-            phone: req.body.phone || null,
-            profile_picture: profilePictureUrl
-        };
+    // Validate
+    addUserSchema.parse(userData);
 
-        console.log("Processed user data:", userData); // Debug log
-
-        // Validate the data
-        addUserSchema.parse(userData);
-
-        // Check for existing user
-        const existing = await findUserByEmail(userData.email);
-        if (existing.rows.length > 0) {
-            if (publicId) {
-                await deleteFromCloudinary(publicId);
-            }
-            return res.status(400).json({ message: "Email already exists" });
-        }
-
-        // Hash password
-        const hashedPassword = await hashPassword(userData.password);
-        const userId = uuidv4();
-
-        // Create user in database
-        await createUser(
-            userId,
-            userData.firstName,
-            userData.lastName,
-            userData.email,
-            hashedPassword,
-            userData.role,
-            userData.phone,
-            userData.profile_picture
-        );
-
-        res.json({
-            message: "User created successfully",
-            user: {
-                id: userId,
-                ...userData,
-                profile_picture: userData.profile_picture
-            }
-        });
-    } catch (error) {
-        console.error("Error in addUser:", error); // Detailed error log
-
-        // Clean up uploaded image if there's an error
-        if (publicId) {
-            await deleteFromCloudinary(publicId);
-        }
-
-        if (error.errors) {
-            return res.status(400).json({
-                message: "Validation error",
-                errors: error.errors
-            });
-        }
-
-        res.status(500).json({
-            message: "Server error",
-            error: error.message
-        });
+    // Check for duplicate email
+    const existing = await findUserByEmail(userData.email);
+    if (existing.rows.length > 0) {
+      return res.status(400).json({ message: "Email already exists" });
     }
+
+    // Hash password
+    const hashedPassword = await hashPassword(userData.password);
+
+    // Create user in DB first (no profile picture yet)
+    await createUser(
+      userId,
+      userData.firstName,
+      userData.lastName,
+      userData.email,
+      hashedPassword,
+      userData.role,
+      userData.phone,
+      null
+    );
+
+    // Respond immediately ✅
+    res.json({
+      message: "User created successfully",
+      user: { id: userId, ...userData }
+    });
+
+    // ---- Handle profile picture upload in background ----
+    if (req.file) {
+      try {
+        const result = await uploadToCloudinary(req.file.buffer);
+        publicId = result.public_id;
+
+        // Update DB with profile picture once uploaded
+        await updateUserProfilePicture(userId, result.secure_url);
+      } catch (uploadErr) {
+        console.error("Cloudinary upload failed:", uploadErr);
+      }
+    }
+  } catch (error) {
+    console.error("Error in addUser:", error);
+
+    if (publicId) {
+      await deleteFromCloudinary(publicId);
+    }
+
+    if (error.errors) {
+      return res.status(400).json({
+        message: "Validation error",
+        errors: error.errors
+      });
+    }
+
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
 };
+
 
 
 export const getUserById = async (req, res) => {

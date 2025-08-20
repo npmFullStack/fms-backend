@@ -115,4 +115,11 @@ export const unrestrictUserById = async (id) => {
   );
 };
 
+// Update only the user's profile picture
+export const updateUserProfilePicture = async (id, profilePictureUrl) => {
+  return await pool.query(
+    `UPDATE user_details SET profile_picture = $1 WHERE user_id = $2`,
+    [profilePictureUrl, id]
+  );
+};
 

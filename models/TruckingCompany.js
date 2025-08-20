@@ -92,9 +92,6 @@ export const updateTruckingCompany = async (id, name, logoUrl) => {
   }
 };
 
-export const toggleTruckingCompanyStatus = async (id) => {
-  return await pool.query(
-    'UPDATE trucking_companies SET is_active = NOT is_active WHERE id = $1 RETURNING *',
-    [id]
-  );
+export const deleteTruckingCompanyById = async (id) => {
+  return await pool.query("DELETE FROM trucking_companies WHERE id = $1", [id]);
 };
