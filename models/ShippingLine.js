@@ -92,9 +92,6 @@ export const updateShippingLine = async (id, name, logoUrl) => {
   }
 };
 
-export const toggleShippingLineStatus = async (id) => {
-  return await pool.query(
-    'UPDATE shipping_lines SET is_active = NOT is_active WHERE id = $1 RETURNING *',
-    [id]
-  );
+export const deleteShippingLineById = async (id) => {
+  return await pool.query("DELETE FROM shipping_lines WHERE id = $1", [id]);
 };

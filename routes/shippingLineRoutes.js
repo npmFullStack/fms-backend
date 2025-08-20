@@ -4,7 +4,7 @@ import {
   getShippingLine,
   addShippingLine,
   editShippingLine,
-  toggleStatus,
+  deleteShippingLine
 } from "../controllers/shippingLineController.js";
 import { verifyTokenMiddleware } from "../middleware/authMiddlewares.js";
 import { upload } from "../utils/imageUtils.js";
@@ -16,6 +16,6 @@ router.get("/", verifyTokenMiddleware, getShippingLines);
 router.get("/:id", verifyTokenMiddleware, getShippingLine);
 router.post("/", verifyTokenMiddleware, upload.single("logo"), addShippingLine);
 router.put("/:id", verifyTokenMiddleware, upload.single("logo"), editShippingLine);
-router.patch("/:id/toggle-status", verifyTokenMiddleware, toggleStatus);
+router.delete("/:id", verifyTokenMiddleware, deleteShippingLine);
 
 export default router;
