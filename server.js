@@ -8,6 +8,8 @@ import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import shippingLineRoutes from "./routes/shippingLineRoutes.js";
 import truckingCompanyRoutes from "./routes/truckingCompanyRoutes.js";
+import shipRoutes from "./routes/shipRoutes.js";
+
 
 dotenv.config();
 
@@ -29,6 +31,7 @@ app.use("/auth", authRoutes);
 app.use("/users", userRoutes);
 app.use("/shipping-lines", shippingLineRoutes);
 app.use("/trucking-companies", truckingCompanyRoutes);
+app.use("/ships", shipRoutes);
 
 const PORT = process.env.PORT || 5000;
 
