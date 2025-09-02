@@ -10,7 +10,7 @@ import shippingLineRoutes from "./routes/shippingLineRoutes.js";
 import truckingCompanyRoutes from "./routes/truckingCompanyRoutes.js";
 import shipRoutes from "./routes/shipRoutes.js";
 import truckRoutes from "./routes/truckRoutes.js";
-
+import bookingRoutes from "./routes/bookingRoutes.js";
 
 dotenv.config();
 
@@ -34,6 +34,7 @@ app.use("/shipping-lines", shippingLineRoutes);
 app.use("/trucking-companies", truckingCompanyRoutes);
 app.use("/ships", shipRoutes);
 app.use("/api/trucks", truckRoutes);
+app.use("/api/bookings", bookingRoutes);
 
 const PORT = process.env.PORT || 5000;
 

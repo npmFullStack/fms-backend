@@ -204,24 +204,109 @@ async function createTables() {
       );
     `);
 
-        // ==================== BOOKINGS ====================
-        // (unchanged from your code — still needed)
+// ========================= BOOKINGS =========================
+await pool.query(`
+CREATE TABLE IF NOT EXISTS bookings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    customer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    marketing_coordinator_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    
+    -- Shipping Information
+    shipping_line_id UUID NOT NULL REFERENCES shipping_lines(id) ON DELETE CASCADE,
+    ship_id UUID REFERENCES ships(id) ON DELETE SET NULL,
+    container_type container_type NOT NULL,
+    booking_mode booking_mode NOT NULL,
+    
+    -- Route Information
+    origin VARCHAR(100) NOT NULL,
+    destination VARCHAR(100) NOT NULL,
+    pickup_lat DECIMAL(10, 8),
+    pickup_lng DECIMAL(11, 8),
+    delivery_lat DECIMAL(10, 8),
+    delivery_lng DECIMAL(11, 8),
+    
+    -- Dates
+    preferred_departure DATE NOT NULL,
+    preferred_delivery DATE,
+    actual_departure DATE,
+    actual_arrival DATE,
+    actual_delivery DATE,
+    
+    -- Commodity
+    commodity VARCHAR(200) NOT NULL,
+    quantity INTEGER DEFAULT 1,
+    
+    -- Status
+    status VARCHAR(50) DEFAULT 'BOOKED',
+    payment_status payment_status DEFAULT 'PENDING',
+    
+    -- Financials
+    freight_charge DECIMAL(12, 2),
+    trucking_charge DECIMAL(12, 2),
+    total_amount DECIMAL(12, 2),
+    
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+`);
+
+await pool.query(`
+CREATE TABLE IF NOT EXISTS booking_trucking_assignments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+    trucking_company_id UUID NOT NULL REFERENCES trucking_companies(id) ON DELETE CASCADE,
+    truck_id UUID REFERENCES trucks(id) ON DELETE SET NULL,
+    assignment_type VARCHAR(20) NOT NULL CHECK (assignment_type IN ('PICKUP', 'DELIVERY')),
+    assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    completed_at TIMESTAMPTZ,
+    status VARCHAR(20) DEFAULT 'PENDING'
+);
+`);
+
+await pool.query(`
+CREATE TABLE IF NOT EXISTS booking_documents (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+    document_type VARCHAR(50) NOT NULL,
+    document_url TEXT NOT NULL,
+    uploaded_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+`);
+
+await pool.query(`
+CREATE TABLE IF NOT EXISTS booking_status_history (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+    status VARCHAR(50) NOT NULL,
+    changed_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+`);
+
+await pool.query(`
+CREATE TABLE IF NOT EXISTS booking_issues (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+    issue_type VARCHAR(50) NOT NULL,
+    description TEXT NOT NULL,
+    reported_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    status VARCHAR(20) DEFAULT 'OPEN',
+    resolved_at TIMESTAMPTZ,
+    resolution_notes TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+`);
 
         // ==================== TRIGGERS ====================
         const tablesForTrigger = [
-  "users",
-  "user_details",
-  "shipping_lines",
-  "shipping_line_details",
-  "trucking_companies",
-  "trucking_company_details",
-  "ships",
-  "ship_details",
-  "shipping_routes",
-  "container_pricing",
-  "trucks",
-  "truck_details",
-  "trucking_routes"
+  "users", "user_details", "shipping_lines", "shipping_line_details", 
+  "trucking_companies", "trucking_company_details", "ships", "ship_details", 
+  "shipping_routes", "container_pricing", "trucks", "truck_details", 
+  "trucking_routes", "bookings", "booking_trucking_assignments", 
+  "booking_documents", "booking_status_history", "booking_issues"
 ];
 
 
