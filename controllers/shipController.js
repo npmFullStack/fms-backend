@@ -1,12 +1,13 @@
-import { 
-  createShip as createShipModel, 
-  getAllShips, 
-  getShipById, 
-  updateShip as updateShipModel, 
-  deleteShip as deleteShipModel 
+import {
+  createShip as createShipModel,
+  getAllShips,
+  getShipById,
+  updateShip as updateShipModel,
+  deleteShip as deleteShipModel
 } from "../models/Ship.js";
 import { shipSchema } from "../schemas/shipSchema.js";
 
+// Create ship
 export const createShip = async (req, res) => {
   try {
     const validated = shipSchema.parse(req.body);
@@ -17,6 +18,7 @@ export const createShip = async (req, res) => {
   }
 };
 
+// Get all ships
 export const getShips = async (req, res) => {
   try {
     const ships = await getAllShips();
@@ -26,6 +28,7 @@ export const getShips = async (req, res) => {
   }
 };
 
+// Get single ship
 export const getShip = async (req, res) => {
   try {
     const ship = await getShipById(req.params.id);
@@ -36,6 +39,7 @@ export const getShip = async (req, res) => {
   }
 };
 
+// Update ship (only vesselNumber + remarks)
 export const updateShip = async (req, res) => {
   try {
     const { id } = req.params;
@@ -46,6 +50,7 @@ export const updateShip = async (req, res) => {
   }
 };
 
+// Delete ship
 export const deleteShip = async (req, res) => {
   try {
     const { id } = req.params;

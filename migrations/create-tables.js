@@ -119,52 +119,35 @@ async function createTables() {
 
         // ==================== SHIPPING ====================
         await pool.query(`
-      CREATE TABLE IF NOT EXISTS ships (
-        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        shipping_line_id UUID NOT NULL REFERENCES shipping_lines(id) ON DELETE CASCADE,
-        name VARCHAR(150) NOT NULL,
-        vessel_number VARCHAR(50),
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        UNIQUE (shipping_line_id, name)
-      );
-    `);
+  CREATE TABLE IF NOT EXISTS ships (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    shipping_line_id UUID NOT NULL REFERENCES shipping_lines(id) ON DELETE CASCADE,
+    vessel_number VARCHAR(50) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+`);
 
         await pool.query(`
-      CREATE TABLE IF NOT EXISTS ship_details (
-        ship_id UUID PRIMARY KEY REFERENCES ships(id) ON DELETE CASCADE,
-        remarks TEXT,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      );
-    `);
+  CREATE TABLE IF NOT EXISTS ship_details (
+    ship_id UUID PRIMARY KEY REFERENCES ships(id) ON DELETE CASCADE,
+    remarks TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+`);
 
         await pool.query(`
-      CREATE TABLE IF NOT EXISTS shipping_routes (
-        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        ship_id UUID NOT NULL REFERENCES ships(id) ON DELETE CASCADE,
-        origin VARCHAR(100) NOT NULL,
-        destination VARCHAR(100) NOT NULL,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        UNIQUE (ship_id, origin, destination)
-      );
-    `);
-
-        await pool.query(`
-      CREATE TABLE IF NOT EXISTS container_pricing (
-        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        shipping_route_id UUID NOT NULL REFERENCES shipping_routes(id) ON DELETE CASCADE,
-        container_type container_type NOT NULL,
-        price DECIMAL(10,2) NOT NULL,
-        valid_from DATE NOT NULL DEFAULT CURRENT_DATE,
-        valid_to DATE,
-        is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        UNIQUE (shipping_route_id, container_type, valid_from)
-      );
-    `);
+  CREATE TABLE IF NOT EXISTS containers (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ship_id UUID NOT NULL REFERENCES ships(id) ON DELETE CASCADE,
+    size container_type NOT NULL,
+    van_number VARCHAR(100) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (ship_id, van_number)
+  );
+`);
 
         // ==================== TRUCKING ====================
         await pool.query(`
@@ -204,8 +187,8 @@ async function createTables() {
       );
     `);
 
-// ========================= BOOKINGS =========================
-await pool.query(`
+        // ========================= BOOKINGS =========================
+        await pool.query(`
 CREATE TABLE IF NOT EXISTS bookings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     customer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -250,7 +233,7 @@ CREATE TABLE IF NOT EXISTS bookings (
 );
 `);
 
-await pool.query(`
+        await pool.query(`
 CREATE TABLE IF NOT EXISTS booking_trucking_assignments (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
@@ -263,7 +246,7 @@ CREATE TABLE IF NOT EXISTS booking_trucking_assignments (
 );
 `);
 
-await pool.query(`
+        await pool.query(`
 CREATE TABLE IF NOT EXISTS booking_documents (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
@@ -274,7 +257,7 @@ CREATE TABLE IF NOT EXISTS booking_documents (
 );
 `);
 
-await pool.query(`
+        await pool.query(`
 CREATE TABLE IF NOT EXISTS booking_status_history (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
@@ -285,7 +268,7 @@ CREATE TABLE IF NOT EXISTS booking_status_history (
 );
 `);
 
-await pool.query(`
+        await pool.query(`
 CREATE TABLE IF NOT EXISTS booking_issues (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
@@ -304,7 +287,7 @@ CREATE TABLE IF NOT EXISTS booking_issues (
         const tablesForTrigger = [
   "users", "user_details", "shipping_lines", "shipping_line_details", 
   "trucking_companies", "trucking_company_details", "ships", "ship_details", 
-  "shipping_routes", "container_pricing", "trucks", "truck_details", 
+  "containers", "trucks", "truck_details", 
   "trucking_routes", "bookings", "booking_trucking_assignments", 
   "booking_documents", "booking_status_history", "booking_issues"
 ];
