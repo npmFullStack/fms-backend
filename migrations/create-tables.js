@@ -187,109 +187,134 @@ async function createTables() {
       );
     `);
 
-        // ========================= BOOKINGS =========================
-        await pool.query(`
-CREATE TABLE IF NOT EXISTS bookings (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    customer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    marketing_coordinator_id UUID REFERENCES users(id) ON DELETE SET NULL,
-    
-    -- Shipping Information
-    shipping_line_id UUID NOT NULL REFERENCES shipping_lines(id) ON DELETE CASCADE,
-    ship_id UUID REFERENCES ships(id) ON DELETE SET NULL,
-    container_type container_type NOT NULL,
-    booking_mode booking_mode NOT NULL,
-    
-    -- Route Information
-    origin VARCHAR(100) NOT NULL,
-    destination VARCHAR(100) NOT NULL,
-    pickup_lat DECIMAL(10, 8),
-    pickup_lng DECIMAL(11, 8),
-    delivery_lat DECIMAL(10, 8),
-    delivery_lng DECIMAL(11, 8),
-    
-    -- Dates
-    preferred_departure DATE NOT NULL,
-    preferred_delivery DATE,
-    actual_departure DATE,
-    actual_arrival DATE,
-    actual_delivery DATE,
-    
-    -- Commodity
-    commodity VARCHAR(200) NOT NULL,
-    quantity INTEGER DEFAULT 1,
-    
-    -- Status
-    status VARCHAR(50) DEFAULT 'BOOKED',
-    payment_status payment_status DEFAULT 'PENDING',
-    
-    -- Financials
-    freight_charge DECIMAL(12, 2),
-    trucking_charge DECIMAL(12, 2),
-    total_amount DECIMAL(12, 2),
-    
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-`);
+     // ==================== BOOKINGS ====================
+    await pool.query(`
+      CREATE SEQUENCE IF NOT EXISTS booking_number_seq START 1;
+      CREATE SEQUENCE IF NOT EXISTS hwb_number_seq START 1;
 
-        await pool.query(`
-CREATE TABLE IF NOT EXISTS booking_trucking_assignments (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
-    trucking_company_id UUID NOT NULL REFERENCES trucking_companies(id) ON DELETE CASCADE,
-    truck_id UUID REFERENCES trucks(id) ON DELETE SET NULL,
-    assignment_type VARCHAR(20) NOT NULL CHECK (assignment_type IN ('PICKUP', 'DELIVERY')),
-    assigned_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    completed_at TIMESTAMPTZ,
-    status VARCHAR(20) DEFAULT 'PENDING'
-);
-`);
+      CREATE TABLE IF NOT EXISTS bookings (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        customer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        marketing_coordinator_id UUID REFERENCES users(id) ON DELETE SET NULL,
+        
+        -- Shipping Information
+        shipping_line_id UUID NOT NULL REFERENCES shipping_lines(id) ON DELETE CASCADE,
+        ship_id UUID REFERENCES ships(id) ON DELETE SET NULL,
+        booking_mode booking_mode NOT NULL,
+        
+        -- Route Information
+        origin VARCHAR(100) NOT NULL,
+        destination VARCHAR(100) NOT NULL,
+        pickup_lat DECIMAL(10, 8),
+        pickup_lng DECIMAL(11, 8),
+        delivery_lat DECIMAL(10, 8),
+        delivery_lng DECIMAL(11, 8),
+        
+        -- Dates
+        preferred_departure DATE NOT NULL,
+        preferred_delivery DATE,
+        actual_departure DATE,
+        actual_arrival DATE,
+        actual_delivery DATE,
+        
+        -- Status
+        status VARCHAR(50) DEFAULT 'BOOKED',
+        payment_status payment_status DEFAULT 'PENDING',
+        
+        -- Auto-generated Numbers
+        booking_number VARCHAR(50) UNIQUE,
+        hwb_number VARCHAR(50) UNIQUE,
+        
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
 
-        await pool.query(`
-CREATE TABLE IF NOT EXISTS booking_documents (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
-    document_type VARCHAR(50) NOT NULL,
-    document_url TEXT NOT NULL,
-    uploaded_by UUID REFERENCES users(id) ON DELETE SET NULL,
-    uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-`);
+      -- Function to generate booking_number
+      CREATE OR REPLACE FUNCTION generate_booking_number()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        NEW.booking_number := 'BKG-' || to_char(NOW(), 'YYYYMMDD') || '-' ||
+          LPAD(nextval('booking_number_seq')::text, 4, '0');
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
 
-        await pool.query(`
-CREATE TABLE IF NOT EXISTS booking_status_history (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
-    status VARCHAR(50) NOT NULL,
-    changed_by UUID REFERENCES users(id) ON DELETE SET NULL,
-    notes TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-`);
+      -- Function to generate hwb_number
+      CREATE OR REPLACE FUNCTION generate_hwb_number()
+      RETURNS TRIGGER AS $$
+      BEGIN
+        NEW.hwb_number := 'HWB-' || to_char(NOW(), 'YYYYMMDD') || '-' ||
+          LPAD(nextval('hwb_number_seq')::text, 4, '0');
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql;
 
-        await pool.query(`
-CREATE TABLE IF NOT EXISTS booking_issues (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
-    issue_type VARCHAR(50) NOT NULL,
-    description TEXT NOT NULL,
-    reported_by UUID REFERENCES users(id) ON DELETE SET NULL,
-    status VARCHAR(20) DEFAULT 'OPEN',
-    resolved_at TIMESTAMPTZ,
-    resolution_notes TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-`);
+      -- Trigger for booking_number
+      DROP TRIGGER IF EXISTS booking_number_trigger ON bookings;
+      CREATE TRIGGER booking_number_trigger
+      BEFORE INSERT ON bookings
+      FOR EACH ROW
+      EXECUTE FUNCTION generate_booking_number();
+
+      -- Trigger for hwb_number
+      DROP TRIGGER IF EXISTS hwb_number_trigger ON bookings;
+      CREATE TRIGGER hwb_number_trigger
+      BEFORE INSERT ON bookings
+      FOR EACH ROW
+      EXECUTE FUNCTION generate_hwb_number();
+    `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS booking_details (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+        
+        container_type container_type NOT NULL,
+        quantity INTEGER DEFAULT 1,
+        commodity VARCHAR(200) NOT NULL,
+
+        pickup_trucker_id UUID REFERENCES trucking_companies(id) ON DELETE SET NULL,
+        pickup_truck_id UUID REFERENCES trucks(id) ON DELETE SET NULL,
+        delivery_trucker_id UUID REFERENCES trucking_companies(id) ON DELETE SET NULL,
+        delivery_truck_id UUID REFERENCES trucks(id) ON DELETE SET NULL,
+
+        remarks TEXT,
+        
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS booking_details (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+        
+        container_type container_type NOT NULL,
+        quantity INTEGER DEFAULT 1,
+        commodity VARCHAR(200) NOT NULL,
+
+        pickup_trucker_id UUID REFERENCES trucking_companies(id) ON DELETE SET NULL,
+        pickup_truck_id UUID REFERENCES trucks(id) ON DELETE SET NULL,
+        delivery_trucker_id UUID REFERENCES trucking_companies(id) ON DELETE SET NULL,
+        delivery_truck_id UUID REFERENCES trucks(id) ON DELETE SET NULL,
+
+        remarks TEXT,
+        
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+
+
 
         // ==================== TRIGGERS ====================
         const tablesForTrigger = [
   "users", "user_details", "shipping_lines", "shipping_line_details", 
   "trucking_companies", "trucking_company_details", "ships", "ship_details", 
   "containers", "trucks", "truck_details", 
-  "trucking_routes", "bookings", "booking_trucking_assignments", 
-  "booking_documents", "booking_status_history", "booking_issues"
+  "trucking_routes", "bookings", "booking_details"
 ];
 
 

@@ -1,94 +1,74 @@
-import { bookingSchema, bookingUpdateSchema, bookingStatusSchema } from "../schemas/bookingSchema.js";
-import {
-  createBooking as createBookingModel,
-  getAllBookings,
-  getBookingById,
-  updateBooking as updateBookingModel,
-  deleteBooking as deleteBookingModel,
-  getBookingsByCustomerId,
-  updateBookingStatus as updateBookingStatusModel
-} from "../models/Booking.js";
+import { bookingSchema, bookingUpdateSchema } from "../schemas/bookingSchema.js";
+import * as Booking from "../models/Booking.js";
 
+// Create a new booking
 export const createBooking = async (req, res) => {
   try {
     const validated = bookingSchema.parse(req.body);
-    const booking = await createBookingModel(validated);
-    res.status(201).json(booking);
+    const booking = await Booking.createBooking(validated);
+
+    res.status(201).json({
+      message: "Booking created successfully",
+      booking,
+    });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(400).json({ message: "Failed to create booking", error: err.message });
   }
 };
 
-export const getBookings = async (req, res) => {
+// Get all bookings
+export const getBookings = async (_req, res) => {
   try {
-    const bookings = await getAllBookings();
-    res.json(bookings);
+    const bookings = await Booking.getAllBookings();
+    res.json({ bookings });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
 
+// Get booking by ID
 export const getBooking = async (req, res) => {
   try {
-    const booking = await getBookingById(req.params.id);
+    const booking = await Booking.getBookingById(req.params.id);
+
     if (!booking) {
       return res.status(404).json({ error: "Booking not found" });
     }
-    res.json(booking);
+
+    res.json({ booking });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 };
 
+// Update booking
 export const updateBooking = async (req, res) => {
   try {
-    const { id } = req.params;
     const validated = bookingUpdateSchema.parse(req.body);
-    
-    const booking = await updateBookingModel(id, validated);
+    const booking = await Booking.updateBooking(req.params.id, validated);
+
     if (!booking) {
       return res.status(404).json({ error: "Booking not found" });
     }
-    
-    res.json(booking);
+
+    res.json({
+      message: "Booking updated successfully",
+      booking,
+    });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(400).json({ message: "Failed to update booking", error: err.message });
   }
 };
 
+// Delete booking
 export const deleteBooking = async (req, res) => {
   try {
-    const { id } = req.params;
-    await deleteBookingModel(id);
-    res.json({ message: "Booking deleted successfully" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
+    await Booking.deleteBooking(req.params.id);
 
-export const getCustomerBookings = async (req, res) => {
-  try {
-    const { customerId } = req.params;
-    const bookings = await getBookingsByCustomerId(customerId);
-    res.json(bookings);
+    res.json({
+      message: "Booking deleted successfully",
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-export const updateBookingStatus = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const validated = bookingStatusSchema.parse(req.body);
-    const userId = req.user?.id; // Assuming you have user info in req.user
-    
-    const booking = await updateBookingStatusModel(id, validated.status, userId);
-    if (!booking) {
-      return res.status(404).json({ error: "Booking not found" });
-    }
-    
-    res.json(booking);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
+    res.status(500).json({ message: "Failed to delete booking", error: err.message });
   }
 };
