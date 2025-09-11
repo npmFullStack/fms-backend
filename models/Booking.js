@@ -60,7 +60,7 @@ export const createBooking = async (bookingData) => {
     ]
   );
 
-  return result.rows[0]; // includes booking_number + hwb_number
+  return result.rows[0]; 
 };
 
 // Get all bookings with related data
