@@ -102,14 +102,14 @@ async function createTables() {
 
         // SHIPPING LINE DETAILS
         await pool.query(`
-  CREATE TABLE IF NOT EXISTS shipping_line_details (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    shipping_line_id UUID NOT NULL REFERENCES shipping_lines(id) ON DELETE CASCADE,
-    logo_url TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-`);
+      CREATE TABLE IF NOT EXISTS shipping_line_details (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        shipping_line_id UUID NOT NULL REFERENCES shipping_lines(id) ON DELETE CASCADE,
+        logo_url TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
 
         await pool.query(`
       CREATE TABLE IF NOT EXISTS ships (
@@ -119,6 +119,18 @@ async function createTables() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+    `);
+
+        // SHIP DETAILS
+        await pool.query(`
+      CREATE TABLE IF NOT EXISTS ship_details (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  ship_id UUID NOT NULL UNIQUE REFERENCES ships(id) ON DELETE CASCADE,
+  remarks TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
     `);
 
         await pool.query(`
@@ -146,14 +158,14 @@ async function createTables() {
 
         // TRUCKING COMPANY DETAILS
         await pool.query(`
-  CREATE TABLE IF NOT EXISTS trucking_company_details (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    trucking_company_id UUID NOT NULL REFERENCES trucking_companies(id) ON DELETE CASCADE,
-    logo_url TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-`);
+      CREATE TABLE IF NOT EXISTS trucking_company_details (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        trucking_company_id UUID NOT NULL REFERENCES trucking_companies(id) ON DELETE CASCADE,
+        logo_url TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
 
         await pool.query(`
       CREATE TABLE IF NOT EXISTS trucks (
@@ -166,6 +178,18 @@ async function createTables() {
         UNIQUE (trucking_company_id, name)
       );
     `);
+
+// TRUCK DETAILS
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS truck_details (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    truck_id UUID NOT NULL UNIQUE REFERENCES trucks(id) ON DELETE CASCADE,
+    remarks TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+`);
+
 
         // ==================== BOOKINGS ====================
         await pool.query(`
@@ -238,18 +262,20 @@ async function createTables() {
 
         // ==================== TRIGGERS ====================
         const tablesForTrigger = [
-  "users",
-  "user_details",
-  "shipping_lines",
-  "shipping_line_details",
-  "ships",
-  "containers",
-  "trucking_companies",
-  "trucking_company_details",
-  "trucks",
-  "bookings",
-  "booking_details"
-];
+            "users",
+            "user_details",
+            "shipping_lines",
+            "shipping_line_details",
+            "ships",
+            "ship_details",
+            "containers",
+            "trucking_companies",
+            "trucking_company_details",
+            "trucks",
+            "truck_details",
+            "bookings",
+            "booking_details"
+        ];
 
         for (const t of tablesForTrigger) {
             await pool.query(`
