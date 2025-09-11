@@ -5,14 +5,22 @@ import * as Booking from "../models/Booking.js";
 export const createBooking = async (req, res) => {
   try {
     const validated = bookingSchema.parse(req.body);
-    const booking = await Booking.createBooking(validated);
+
+    // Attach logged-in user ID as creator
+    const booking = await Booking.createBooking({
+      ...validated,
+      user_id: req.user?.id || null,
+    });
 
     res.status(201).json({
       message: "Booking created successfully",
       booking,
     });
   } catch (err) {
-    res.status(400).json({ message: "Failed to create booking", error: err.message });
+    res.status(400).json({
+      message: "Failed to create booking",
+      error: err.message,
+    });
   }
 };
 
@@ -56,7 +64,10 @@ export const updateBooking = async (req, res) => {
       booking,
     });
   } catch (err) {
-    res.status(400).json({ message: "Failed to update booking", error: err.message });
+    res.status(400).json({
+      message: "Failed to update booking",
+      error: err.message,
+    });
   }
 };
 
@@ -64,11 +75,11 @@ export const updateBooking = async (req, res) => {
 export const deleteBooking = async (req, res) => {
   try {
     await Booking.deleteBooking(req.params.id);
-
-    res.json({
-      message: "Booking deleted successfully",
-    });
+    res.json({ message: "Booking deleted successfully" });
   } catch (err) {
-    res.status(500).json({ message: "Failed to delete booking", error: err.message });
+    res.status(500).json({
+      message: "Failed to delete booking",
+      error: err.message,
+    });
   }
 };

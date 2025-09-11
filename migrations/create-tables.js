@@ -1,3 +1,4 @@
+// create-tables.js
 import { pool } from "../db/index.js";
 import dotenv from "dotenv";
 import bcrypt from "bcryptjs";
@@ -23,7 +24,7 @@ async function createTables() {
         END IF;
 
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'container_type') THEN
-          CREATE TYPE container_type AS ENUM ('LCL', '20FT', '40FT');
+          CREATE TYPE container_type AS ENUM ('LCL', '20FT', '40FT', '40FT_HC');
         END IF;
 
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'booking_mode') THEN
@@ -39,10 +40,20 @@ async function createTables() {
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'payment_status') THEN
           CREATE TYPE payment_status AS ENUM ('PENDING', 'PAID', 'OVERDUE');
         END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'booking_status') THEN
+          CREATE TYPE booking_status AS ENUM (
+            'PENDING',
+            'PICKUP',
+            'IN_PORT',
+            'IN_TRANSIT',
+            'DELIVERED'
+          );
+        END IF;
       END $$;
     `);
 
-        // 3) Updated-at trigger function
+        // 3) Updated-at trigger
         await pool.query(`
       CREATE OR REPLACE FUNCTION update_updated_at()
       RETURNS TRIGGER AS $$
@@ -53,7 +64,7 @@ async function createTables() {
       $$ LANGUAGE plpgsql;
     `);
 
-        // ==================== CORE USERS ====================
+        // ==================== USERS ====================
         await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -78,7 +89,7 @@ async function createTables() {
       );
     `);
 
-        // ==================== PARTNERS ====================
+        // ==================== SHIPPING LINES ====================
         await pool.query(`
       CREATE TABLE IF NOT EXISTS shipping_lines (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -89,15 +100,40 @@ async function createTables() {
       );
     `);
 
+        // SHIPPING LINE DETAILS
         await pool.query(`
-      CREATE TABLE IF NOT EXISTS shipping_line_details (
-        shipping_line_id UUID PRIMARY KEY REFERENCES shipping_lines(id) ON DELETE CASCADE,
-        logo_url TEXT,
+  CREATE TABLE IF NOT EXISTS shipping_line_details (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    shipping_line_id UUID NOT NULL REFERENCES shipping_lines(id) ON DELETE CASCADE,
+    logo_url TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+`);
+
+        await pool.query(`
+      CREATE TABLE IF NOT EXISTS ships (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        shipping_line_id UUID NOT NULL REFERENCES shipping_lines(id) ON DELETE CASCADE,
+        vessel_number VARCHAR(50) NOT NULL,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
 
+        await pool.query(`
+      CREATE TABLE IF NOT EXISTS containers (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        ship_id UUID NOT NULL REFERENCES ships(id) ON DELETE CASCADE,
+        size container_type NOT NULL,
+        van_number VARCHAR(100) NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE (ship_id, van_number)
+      );
+    `);
+
+        // ==================== TRUCKING ====================
         await pool.query(`
       CREATE TABLE IF NOT EXISTS trucking_companies (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -108,48 +144,17 @@ async function createTables() {
       );
     `);
 
+        // TRUCKING COMPANY DETAILS
         await pool.query(`
-      CREATE TABLE IF NOT EXISTS trucking_company_details (
-        trucking_company_id UUID PRIMARY KEY REFERENCES trucking_companies(id) ON DELETE CASCADE,
-        logo_url TEXT,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      );
-    `);
-
-        // ==================== SHIPPING ====================
-        await pool.query(`
-  CREATE TABLE IF NOT EXISTS ships (
+  CREATE TABLE IF NOT EXISTS trucking_company_details (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    shipping_line_id UUID NOT NULL REFERENCES shipping_lines(id) ON DELETE CASCADE,
-    vessel_number VARCHAR(50) NOT NULL,
+    trucking_company_id UUID NOT NULL REFERENCES trucking_companies(id) ON DELETE CASCADE,
+    logo_url TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );
 `);
 
-        await pool.query(`
-  CREATE TABLE IF NOT EXISTS ship_details (
-    ship_id UUID PRIMARY KEY REFERENCES ships(id) ON DELETE CASCADE,
-    remarks TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
-`);
-
-        await pool.query(`
-  CREATE TABLE IF NOT EXISTS containers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    ship_id UUID NOT NULL REFERENCES ships(id) ON DELETE CASCADE,
-    size container_type NOT NULL,
-    van_number VARCHAR(100) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (ship_id, van_number)
-  );
-`);
-
-        // ==================== TRUCKING ====================
         await pool.query(`
       CREATE TABLE IF NOT EXISTS trucks (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -162,113 +167,59 @@ async function createTables() {
       );
     `);
 
+        // ==================== BOOKINGS ====================
         await pool.query(`
-      CREATE TABLE IF NOT EXISTS truck_details (
-        truck_id UUID PRIMARY KEY REFERENCES trucks(id) ON DELETE CASCADE,
-        remarks TEXT,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      );
-    `);
-
-        await pool.query(`
-      CREATE TABLE IF NOT EXISTS trucking_routes (
-        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        trucking_company_id UUID NOT NULL REFERENCES trucking_companies(id) ON DELETE CASCADE,
-        origin VARCHAR(100) NOT NULL,
-        destination VARCHAR(100) NOT NULL,
-        rate DECIMAL(10,2) NOT NULL,
-        valid_from DATE NOT NULL DEFAULT CURRENT_DATE,
-        valid_to DATE,
-        is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        UNIQUE (trucking_company_id, origin, destination, valid_from)
-      );
-    `);
-
-     // ==================== BOOKINGS ====================
-    await pool.query(`
       CREATE SEQUENCE IF NOT EXISTS booking_number_seq START 1;
       CREATE SEQUENCE IF NOT EXISTS hwb_number_seq START 1;
 
       CREATE TABLE IF NOT EXISTS bookings (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        customer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        marketing_coordinator_id UUID REFERENCES users(id) ON DELETE SET NULL,
-        
-        -- Shipping Information
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+
+        booking_date DATE NOT NULL,
+        shipper VARCHAR(150) NOT NULL,
+        first_name VARCHAR(100),
+        last_name VARCHAR(100),
+        phone VARCHAR(20),
+
         shipping_line_id UUID NOT NULL REFERENCES shipping_lines(id) ON DELETE CASCADE,
         ship_id UUID REFERENCES ships(id) ON DELETE SET NULL,
+        container_type container_type NOT NULL,
+        quantity INTEGER DEFAULT 1,
         booking_mode booking_mode NOT NULL,
-        
-        -- Route Information
-        origin VARCHAR(100) NOT NULL,
-        destination VARCHAR(100) NOT NULL,
-        pickup_lat DECIMAL(10, 8),
-        pickup_lng DECIMAL(11, 8),
-        delivery_lat DECIMAL(10, 8),
-        delivery_lng DECIMAL(11, 8),
-        
-        -- Dates
+        commodity VARCHAR(200) NOT NULL,
+
+        origin_port VARCHAR(100) NOT NULL,
+        destination_port VARCHAR(100) NOT NULL,
+
+        pickup_lat DECIMAL(10,8),
+        pickup_lng DECIMAL(11,8),
+        delivery_lat DECIMAL(10,8),
+        delivery_lng DECIMAL(11,8),
+
         preferred_departure DATE NOT NULL,
         preferred_delivery DATE,
         actual_departure DATE,
         actual_arrival DATE,
         actual_delivery DATE,
-        
-        -- Status
-        status VARCHAR(50) DEFAULT 'BOOKED',
+
+        status booking_status DEFAULT 'PENDING',
         payment_status payment_status DEFAULT 'PENDING',
-        
-        -- Auto-generated Numbers
+
         booking_number VARCHAR(50) UNIQUE,
         hwb_number VARCHAR(50) UNIQUE,
-        
+
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
-
-      -- Function to generate booking_number
-      CREATE OR REPLACE FUNCTION generate_booking_number()
-      RETURNS TRIGGER AS $$
-      BEGIN
-        NEW.booking_number := 'BKG-' || to_char(NOW(), 'YYYYMMDD') || '-' ||
-          LPAD(nextval('booking_number_seq')::text, 4, '0');
-        RETURN NEW;
-      END;
-      $$ LANGUAGE plpgsql;
-
-      -- Function to generate hwb_number
-      CREATE OR REPLACE FUNCTION generate_hwb_number()
-      RETURNS TRIGGER AS $$
-      BEGIN
-        NEW.hwb_number := 'HWB-' || to_char(NOW(), 'YYYYMMDD') || '-' ||
-          LPAD(nextval('hwb_number_seq')::text, 4, '0');
-        RETURN NEW;
-      END;
-      $$ LANGUAGE plpgsql;
-
-      -- Trigger for booking_number
-      DROP TRIGGER IF EXISTS booking_number_trigger ON bookings;
-      CREATE TRIGGER booking_number_trigger
-      BEFORE INSERT ON bookings
-      FOR EACH ROW
-      EXECUTE FUNCTION generate_booking_number();
-
-      -- Trigger for hwb_number
-      DROP TRIGGER IF EXISTS hwb_number_trigger ON bookings;
-      CREATE TRIGGER hwb_number_trigger
-      BEFORE INSERT ON bookings
-      FOR EACH ROW
-      EXECUTE FUNCTION generate_hwb_number();
     `);
 
-    await pool.query(`
+        // booking_details
+        await pool.query(`
       CREATE TABLE IF NOT EXISTS booking_details (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
-        
+
         container_type container_type NOT NULL,
         quantity INTEGER DEFAULT 1,
         commodity VARCHAR(200) NOT NULL,
@@ -279,44 +230,26 @@ async function createTables() {
         delivery_truck_id UUID REFERENCES trucks(id) ON DELETE SET NULL,
 
         remarks TEXT,
-        
+
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
-
-
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS booking_details (
-        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
-        
-        container_type container_type NOT NULL,
-        quantity INTEGER DEFAULT 1,
-        commodity VARCHAR(200) NOT NULL,
-
-        pickup_trucker_id UUID REFERENCES trucking_companies(id) ON DELETE SET NULL,
-        pickup_truck_id UUID REFERENCES trucks(id) ON DELETE SET NULL,
-        delivery_trucker_id UUID REFERENCES trucking_companies(id) ON DELETE SET NULL,
-        delivery_truck_id UUID REFERENCES trucks(id) ON DELETE SET NULL,
-
-        remarks TEXT,
-        
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      );
-    `);
-
-
 
         // ==================== TRIGGERS ====================
         const tablesForTrigger = [
-  "users", "user_details", "shipping_lines", "shipping_line_details", 
-  "trucking_companies", "trucking_company_details", "ships", "ship_details", 
-  "containers", "trucks", "truck_details", 
-  "trucking_routes", "bookings", "booking_details"
+  "users",
+  "user_details",
+  "shipping_lines",
+  "shipping_line_details",
+  "ships",
+  "containers",
+  "trucking_companies",
+  "trucking_company_details",
+  "trucks",
+  "bookings",
+  "booking_details"
 ];
-
 
         for (const t of tablesForTrigger) {
             await pool.query(`
