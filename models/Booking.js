@@ -11,7 +11,7 @@ export const createBooking = async (bookingData) => {
     phone,
     shipping_line_id,
     ship_id,
-    container_type,
+    container_id,
     quantity,
     booking_mode,
     commodity,
@@ -23,18 +23,16 @@ export const createBooking = async (bookingData) => {
     delivery_lng,
     preferred_departure,
     preferred_delivery,
-    van_number,
-    seal_number,
   } = bookingData;
 
   const result = await pool.query(
     `INSERT INTO bookings (
       user_id, booking_date, shipper, first_name, last_name, phone,
-      shipping_line_id, ship_id, container_type, quantity, booking_mode,
+      shipping_line_id, ship_id, container_id, quantity, booking_mode,
       commodity, origin_port, destination_port,
       pickup_lat, pickup_lng, delivery_lat, delivery_lng,
       preferred_departure, preferred_delivery,
-      van_number, seal_number
+      booking_number, hwb_number
     )
     VALUES (
       $1,$2,$3,$4,$5,$6,
@@ -42,38 +40,10 @@ export const createBooking = async (bookingData) => {
       $12,$13,$14,
       $15,$16,$17,$18,
       $19,$20,
-      $21,$22
+      'BKG-' || TO_CHAR(NOW(), 'YYYYMMDD') || '-' || LPAD(nextval('booking_number_seq')::text, 5, '0'),
+      'HWB-' || TO_CHAR(NOW(), 'YYYYMMDD') || '-' || LPAD(nextval('hwb_number_seq')::text, 5, '0')
     )
-    RETURNING 
-      id,
-      booking_number,
-      hwb_number,
-      user_id,
-      booking_date,
-      shipper,
-      first_name,
-      last_name,
-      phone,
-      shipping_line_id,
-      ship_id,
-      container_type,
-      quantity,
-      booking_mode,
-      commodity,
-      origin_port,
-      destination_port,
-      pickup_lat,
-      pickup_lng,
-      delivery_lat,
-      delivery_lng,
-      preferred_departure,
-      preferred_delivery,
-      van_number,
-      seal_number,
-      status,
-      payment_status,
-      created_at,
-      updated_at`,
+    RETURNING *`,
     [
       user_id,
       booking_date,
@@ -83,7 +53,7 @@ export const createBooking = async (bookingData) => {
       phone,
       shipping_line_id,
       ship_id,
-      container_type,
+      container_id,
       quantity,
       booking_mode,
       commodity,
@@ -95,8 +65,6 @@ export const createBooking = async (bookingData) => {
       delivery_lng,
       preferred_departure,
       preferred_delivery,
-      van_number,
-      seal_number,
     ]
   );
 
@@ -112,12 +80,15 @@ export const getAllBookings = async () => {
       ud.first_name AS created_by_first_name,
       ud.last_name AS created_by_last_name,
       sl.name AS shipping_line_name,
-      s.vessel_number AS ship_vessel_number
+      s.vessel_number AS ship_vessel_number,
+      c.size AS container_size,
+      c.van_number AS container_van_number
     FROM bookings b
     LEFT JOIN users u ON b.user_id = u.id
     LEFT JOIN user_details ud ON u.id = ud.user_id
     LEFT JOIN shipping_lines sl ON b.shipping_line_id = sl.id
     LEFT JOIN ships s ON b.ship_id = s.id
+    LEFT JOIN containers c ON b.container_id = c.id
     ORDER BY b.created_at DESC
   `);
   return result.rows;
@@ -133,12 +104,15 @@ export const getBookingById = async (id) => {
       ud.first_name AS created_by_first_name,
       ud.last_name AS created_by_last_name,
       sl.name AS shipping_line_name,
-      s.vessel_number AS ship_vessel_number
+      s.vessel_number AS ship_vessel_number,
+      c.size AS container_size,
+      c.van_number AS container_van_number
     FROM bookings b
     LEFT JOIN users u ON b.user_id = u.id
     LEFT JOIN user_details ud ON u.id = ud.user_id
     LEFT JOIN shipping_lines sl ON b.shipping_line_id = sl.id
     LEFT JOIN ships s ON b.ship_id = s.id
+    LEFT JOIN containers c ON b.container_id = c.id
     WHERE b.id = $1
   `,
     [id]
@@ -157,7 +131,7 @@ export const updateBooking = async (id, bookingData) => {
     phone,
     shipping_line_id,
     ship_id,
-    container_type,
+    container_id,
     quantity,
     booking_mode,
     commodity,
@@ -169,8 +143,6 @@ export const updateBooking = async (id, bookingData) => {
     delivery_lng,
     preferred_departure,
     preferred_delivery,
-    van_number,
-    seal_number,
     status,
     payment_status,
   } = bookingData;
@@ -184,7 +156,7 @@ export const updateBooking = async (id, bookingData) => {
       phone = $5,
       shipping_line_id = $6,
       ship_id = $7,
-      container_type = $8,
+      container_id = $8,
       quantity = $9,
       booking_mode = $10,
       commodity = $11,
@@ -196,12 +168,10 @@ export const updateBooking = async (id, bookingData) => {
       delivery_lng = $17,
       preferred_departure = $18,
       preferred_delivery = $19,
-      van_number = $20,
-      seal_number = $21,
-      status = $22,
-      payment_status = $23,
+      status = $20,
+      payment_status = $21,
       updated_at = NOW()
-    WHERE id = $24
+    WHERE id = $22
     RETURNING *`,
     [
       booking_date,
@@ -211,7 +181,7 @@ export const updateBooking = async (id, bookingData) => {
       phone,
       shipping_line_id,
       ship_id,
-      container_type,
+      container_id,
       quantity,
       booking_mode,
       commodity,
@@ -223,8 +193,6 @@ export const updateBooking = async (id, bookingData) => {
       delivery_lng,
       preferred_departure,
       preferred_delivery,
-      van_number,
-      seal_number,
       status,
       payment_status,
       id,
