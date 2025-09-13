@@ -12,7 +12,7 @@ export const bookingSchema = z.object({
   shipping_line_id: z.string().uuid(),
   ship_id: z.string().uuid(),
 
-  container_type: z.enum(["LCL", "20FT", "40FT", "40FT_HC"]),
+  container_type: z.enum(["LCL", "20FT", "40FT"]),
   booking_mode: z.enum(["DOOR_TO_DOOR", "PIER_TO_PIER", "CY_TO_DOOR", "DOOR_TO_CY", "CY_TO_CY"]),
   commodity: z.string().min(2, "Commodity must be at least 2 characters"),
   quantity: z.number().int().positive(),
