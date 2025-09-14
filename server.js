@@ -2,8 +2,6 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import path from "path";
-import { fileURLToPath } from "url";
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import shippingLineRoutes from "./routes/shippingLineRoutes.js";
@@ -16,7 +14,7 @@ dotenv.config();
 
 const app = express();
 
-// Configure CORS properly
+// Configure CORS
 app.use(
     cors({
         origin: ["http://localhost:3000", "https://fms-azure.vercel.app"],
@@ -35,6 +33,11 @@ app.use("/trucking-companies", truckingCompanyRoutes);
 app.use("/ships", shipRoutes);
 app.use("/api/trucks", truckRoutes);
 app.use("/api/bookings", bookingRoutes);
+
+// Simple health check
+app.get("/health", (req, res) => {
+    res.status(200).json({ status: "OK" });
+});
 
 const PORT = process.env.PORT || 5000;
 
