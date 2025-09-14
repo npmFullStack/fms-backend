@@ -4,7 +4,7 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "start": "nodemon server.js",
+    "start": "node server.js",
     "dev": "cp .env.local .env && nodemon server.js",
     "migrate": "node ./migrations/create-tables.js",
     "reset-db": "node ./migrations/reset-db.js",
