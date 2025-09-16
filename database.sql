@@ -308,7 +308,7 @@ EXECUTE FUNCTION update_updated_at();
 
 -- ==================== ADMIN SEED ====================
 INSERT INTO users (email, password, role)
-VALUES ('admin@gmail.com', '$2a$10$rOzZJN.9p8W9eF5YQkKZv.LqB7nV1mW8cJdK5tR3sS2vX1pY6hHdC', 'general_manager')
+VALUES ('admin@gmail.com', '$2a$10$P/z4lW/t6ZmtJ8jiIiHQY.b.lTRJzcfUDiuD1bVMMdQYUDHJHmAT.', 'general_manager')
 ON CONFLICT (email) DO NOTHING;
 
 INSERT INTO user_details (user_id, first_name, last_name)

@@ -1,3 +1,5 @@
+// controllers/bookingController
+
 import { bookingSchema, bookingUpdateSchema } from "../schemas/bookingSchema.js";
 import * as Booking from "../models/Booking.js";
 

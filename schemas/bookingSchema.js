@@ -1,10 +1,8 @@
-// schemas/bookingSchema.js
+// backend/schemas/bookingSchema.js
 import { z } from "zod";
 
 export const bookingSchema = z.object({
-  booking_date: z.string().min(1, "Booking date is required"),
-
-  shipper: z.string().min(1, "Shipper is required"),
+    shipper: z.string().min(1, "Shipper is required"),
   first_name: z.string().optional().nullable(),
   last_name: z.string().optional().nullable(),
   phone: z.string().optional().nullable(),

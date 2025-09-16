@@ -31,8 +31,8 @@ app.use("/users", userRoutes);
 app.use("/shipping-lines", shippingLineRoutes);
 app.use("/trucking-companies", truckingCompanyRoutes);
 app.use("/ships", shipRoutes);
-app.use("/api/trucks", truckRoutes);
-app.use("/api/bookings", bookingRoutes);
+app.use("/trucks", truckRoutes);
+app.use("/bookings", bookingRoutes);
 
 // Simple health check
 app.get("/health", (req, res) => {
