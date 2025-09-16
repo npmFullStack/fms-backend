@@ -39,10 +39,9 @@ export const createBooking = async bookingData => {
       $11, $12, $13,
       $14, $15, $16, $17,
       $18, $19,
-      'BKG-' || TO_CHAR(NOW(), 'YYYYMMDD') || '-' ||
-      LPAD(nextval('booking_number_seq')::text, 5, '0'),
-      'HWB-' || TO_CHAR(NOW(), 'YYYYMMDD') || '-' ||
-      LPAD(nextval('hwb_number_seq')::text, 5, '0')
+'BKG-' || LPAD(nextval('booking_number_seq')::text, 4, '0'),
+'HWB-' || LPAD(nextval('hwb_number_seq')::text, 4, '0')
+
     )
     RETURNING *`,
         [
