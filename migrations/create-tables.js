@@ -194,7 +194,6 @@ async function createTables() {
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 
-        booking_date DATE NOT NULL,
         shipper VARCHAR(150) NOT NULL,
         first_name VARCHAR(100),
         last_name VARCHAR(100),
@@ -236,11 +235,8 @@ async function createTables() {
       CREATE TABLE IF NOT EXISTS booking_details (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
-
-        container_type container_type NOT NULL,
         quantity INTEGER DEFAULT 1,
         commodity VARCHAR(200) NOT NULL,
-
         pickup_trucker_id UUID REFERENCES trucking_companies(id) ON DELETE SET NULL,
         pickup_truck_id UUID REFERENCES trucks(id) ON DELETE SET NULL,
         delivery_trucker_id UUID REFERENCES trucking_companies(id) ON DELETE SET NULL,

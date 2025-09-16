@@ -8,8 +8,9 @@ export const bookingSchema = z.object({
   phone: z.string().optional().nullable(),
 
   shipping_line_id: z.string().uuid(),
-  ship_id: z.string().uuid(),
-  container_id: z.string().uuid(),
+ship_id: z.string().uuid().optional().nullable(),
+container_id: z.string().uuid().optional().nullable(),
+
 
   booking_mode: z.enum([
     "DOOR_TO_DOOR",
