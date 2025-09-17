@@ -115,6 +115,7 @@ async function createTables() {
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         shipping_line_id UUID NOT NULL REFERENCES shipping_lines(id) ON DELETE CASCADE,
         vessel_number VARCHAR(50) NOT NULL,
+        ship_name VARCHAR(100) NOT NULL,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
@@ -136,6 +137,7 @@ async function createTables() {
         ship_id UUID NOT NULL REFERENCES ships(id) ON DELETE CASCADE,
         size container_type NOT NULL,
         van_number VARCHAR(100) NOT NULL,
+        is_returned BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         UNIQUE (ship_id, van_number)

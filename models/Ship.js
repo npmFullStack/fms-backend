@@ -1,33 +1,38 @@
 import { pool } from "../db/index.js";
 
 // Create a ship WITH containers
-export const createShip = async ({ vesselNumber, shippingLineId, containers }) => {
+export const createShip = async ({
+  shipName,
+  vesselNumber,
+  shippingLineId,
+  containers
+}) => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
 
     // 1) Create ship
     const shipRes = await client.query(
-      `INSERT INTO ships (vessel_number, shipping_line_id)
-       VALUES ($1, $2)
+      `INSERT INTO ships (ship_name, vessel_number, shipping_line_id) 
+       VALUES ($1, $2, $3) 
        RETURNING id`,
-      [vesselNumber || null, shippingLineId]
+      [shipName, vesselNumber || null, shippingLineId]
     );
     const shipId = shipRes.rows[0].id;
 
-    // 2) Insert placeholder into ship_details (remarks is optional)
+    // 2) Ship details
     await client.query(
-      `INSERT INTO ship_details (ship_id, remarks) VALUES ($1, $2)
+      `INSERT INTO ship_details (ship_id, remarks) VALUES ($1, $2) 
        ON CONFLICT (ship_id) DO NOTHING`,
       [shipId, null]
     );
 
-    // 3) Containers
+    // 3) Containers (auto is_returned = TRUE)
     if (containers && containers.length > 0) {
       for (const container of containers) {
         await client.query(
-          `INSERT INTO containers (ship_id, size, van_number)
-           VALUES ($1, $2, $3)`,
+          `INSERT INTO containers (ship_id, size, van_number, is_returned) 
+           VALUES ($1, $2, $3, TRUE)`,
           [shipId, container.size, container.vanNumber]
         );
       }
@@ -48,6 +53,7 @@ export const getAllShips = async () => {
   const result = await pool.query(`
     SELECT 
       s.id,
+      s.ship_name,
       s.vessel_number,
       s.shipping_line_id,
       sl.name AS shipping_line_name,
@@ -58,6 +64,7 @@ export const getAllShips = async () => {
             'id', c.id,
             'size', c.size,
             'van_number', c.van_number,
+            'is_returned', c.is_returned,
             'created_at', c.created_at
           )
         ) FILTER (WHERE c.id IS NOT NULL), '[]'
@@ -79,6 +86,7 @@ export const getShipById = async (id) => {
     `
     SELECT 
       s.id,
+      s.ship_name,
       s.vessel_number,
       s.shipping_line_id,
       sl.name AS shipping_line_name,
@@ -89,6 +97,7 @@ export const getShipById = async (id) => {
             'id', c.id,
             'size', c.size,
             'van_number', c.van_number,
+            'is_returned', c.is_returned,
             'created_at', c.created_at
           )
         ) FILTER (WHERE c.id IS NOT NULL), '[]'
@@ -106,16 +115,22 @@ export const getShipById = async (id) => {
   return result.rows[0];
 };
 
-// Update ship (vesselNumber + remarks only)
-export const updateShip = async (id, { vesselNumber, remarks }) => {
+// Update ship (shipName + vesselNumber + remarks)
+export const updateShip = async (id, { shipName, vesselNumber, remarks }) => {
   await pool.query(
-    `UPDATE ships SET vessel_number = $1, updated_at = NOW() WHERE id = $2`,
-    [vesselNumber || null, id]
+    `UPDATE ships 
+     SET ship_name = $1, vessel_number = $2, updated_at = NOW() 
+     WHERE id = $3`,
+    [shipName || null, vesselNumber || null, id]
   );
+
   await pool.query(
-    `UPDATE ship_details SET remarks = $1, updated_at = NOW() WHERE ship_id = $2`,
+    `UPDATE ship_details 
+     SET remarks = $1, updated_at = NOW() 
+     WHERE ship_id = $2`,
     [remarks || null, id]
   );
+
   return { id };
 };
 
