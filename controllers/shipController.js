@@ -39,11 +39,19 @@ export const getShip = async (req, res) => {
   }
 };
 
-// Update ship (only vesselNumber + remarks)
+// Update ship (shipName + vesselNumber + remarks)
 export const updateShip = async (req, res) => {
   try {
     const { id } = req.params;
-    await updateShipModel(id, req.body);
+
+    // allow partial updates but still validate fields if present
+    const updateSchema = shipSchema.partial({
+      containers: true // exclude containers from update validation
+    });
+
+    const validated = updateSchema.parse(req.body);
+
+    await updateShipModel(id, validated);
     res.json({ message: "Ship updated" });
   } catch (err) {
     res.status(400).json({ error: err.message });
