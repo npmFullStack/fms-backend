@@ -1,19 +1,18 @@
 import express from "express";
 import {
-  createContainer,
-  getContainers,
+  addContainer,
+  getLineContainers,
   getContainer,
-  updateContainer,
-  deleteContainer,
+  editContainer,
+  removeContainer
 } from "../controllers/containerController.js";
-import { verifyTokenMiddleware } from "../middleware/authMiddlewares.js";
 
 const router = express.Router();
 
-router.get("/ship/:shipId", verifyTokenMiddleware, getContainers);
-router.get("/:id", verifyTokenMiddleware, getContainer);
-router.post("/", verifyTokenMiddleware, createContainer);
-router.put("/:id", verifyTokenMiddleware, updateContainer);
-router.delete("/:id", verifyTokenMiddleware, deleteContainer);
+router.post("/", addContainer);
+router.get("/line/:shippingLineId", getLineContainers);
+router.get("/:id", getContainer);
+router.put("/:id", editContainer);
+router.delete("/:id", removeContainer);
 
 export default router;
