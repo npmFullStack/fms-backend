@@ -133,15 +133,16 @@ async function createTables() {
 
         await pool.query(`
       CREATE TABLE IF NOT EXISTS containers (
-        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        ship_id UUID NOT NULL REFERENCES ships(id) ON DELETE CASCADE,
-        size container_type NOT NULL,
-        van_number VARCHAR(100) NOT NULL,
-        is_returned BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        UNIQUE (ship_id, van_number)
-      );
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  shipping_line_id UUID NOT NULL REFERENCES shipping_lines(id) ON DELETE CASCADE,
+  size container_type NOT NULL,
+  van_number VARCHAR(100) NOT NULL,
+  is_returned BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (shipping_line_id, van_number)
+);
+
     `);
 
         // ==================== TRUCKING ====================

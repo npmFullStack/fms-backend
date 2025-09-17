@@ -1,12 +1,7 @@
 import { pool } from "../db/index.js";
 
-// Create a ship WITH containers
-export const createShip = async ({
-  shipName,
-  vesselNumber,
-  shippingLineId,
-  containers
-}) => {
+// Create a ship (no containers anymore)
+export const createShip = async ({ shipName, vesselNumber, shippingLineId }) => {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
@@ -20,23 +15,13 @@ export const createShip = async ({
     );
     const shipId = shipRes.rows[0].id;
 
-    // 2) Ship details
+    // 2) Ship details (remarks optional)
     await client.query(
-      `INSERT INTO ship_details (ship_id, remarks) VALUES ($1, $2) 
+      `INSERT INTO ship_details (ship_id, remarks) 
+       VALUES ($1, $2) 
        ON CONFLICT (ship_id) DO NOTHING`,
       [shipId, null]
     );
-
-    // 3) Containers (auto is_returned = TRUE)
-    if (containers && containers.length > 0) {
-      for (const container of containers) {
-        await client.query(
-          `INSERT INTO containers (ship_id, size, van_number, is_returned) 
-           VALUES ($1, $2, $3, TRUE)`,
-          [shipId, container.size, container.vanNumber]
-        );
-      }
-    }
 
     await client.query("COMMIT");
     return { id: shipId };
@@ -48,7 +33,7 @@ export const createShip = async ({
   }
 };
 
-// Get all ships WITH containers
+// Get all ships (no containers join)
 export const getAllShips = async () => {
   const result = await pool.query(`
     SELECT 
@@ -57,30 +42,17 @@ export const getAllShips = async () => {
       s.vessel_number,
       s.shipping_line_id,
       sl.name AS shipping_line_name,
-      sd.remarks,
-      COALESCE(
-        json_agg(
-          DISTINCT jsonb_build_object(
-            'id', c.id,
-            'size', c.size,
-            'van_number', c.van_number,
-            'is_returned', c.is_returned,
-            'created_at', c.created_at
-          )
-        ) FILTER (WHERE c.id IS NOT NULL), '[]'
-      ) AS containers
+      sd.remarks
     FROM ships s
     JOIN shipping_lines sl ON s.shipping_line_id = sl.id
     LEFT JOIN ship_details sd ON s.id = sd.ship_id
-    LEFT JOIN containers c ON s.id = c.ship_id
-    GROUP BY s.id, sl.name, sd.remarks
     ORDER BY s.created_at DESC
   `);
 
   return result.rows;
 };
 
-// Get single ship WITH containers
+// Get single ship (no containers join)
 export const getShipById = async (id) => {
   const result = await pool.query(
     `
@@ -90,24 +62,11 @@ export const getShipById = async (id) => {
       s.vessel_number,
       s.shipping_line_id,
       sl.name AS shipping_line_name,
-      sd.remarks,
-      COALESCE(
-        json_agg(
-          DISTINCT jsonb_build_object(
-            'id', c.id,
-            'size', c.size,
-            'van_number', c.van_number,
-            'is_returned', c.is_returned,
-            'created_at', c.created_at
-          )
-        ) FILTER (WHERE c.id IS NOT NULL), '[]'
-      ) AS containers
+      sd.remarks
     FROM ships s
     JOIN shipping_lines sl ON s.shipping_line_id = sl.id
     LEFT JOIN ship_details sd ON s.id = sd.ship_id
-    LEFT JOIN containers c ON s.id = c.ship_id
     WHERE s.id = $1
-    GROUP BY s.id, sl.name, sd.remarks
   `,
     [id]
   );
@@ -134,7 +93,7 @@ export const updateShip = async (id, { shipName, vesselNumber, remarks }) => {
   return { id };
 };
 
-// Delete ship (containers will be auto-deleted via CASCADE)
+// Delete ship
 export const deleteShip = async (id) => {
   await pool.query(`DELETE FROM ships WHERE id = $1`, [id]);
   return { id };

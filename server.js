@@ -7,6 +7,7 @@ import userRoutes from "./routes/userRoutes.js";
 import shippingLineRoutes from "./routes/shippingLineRoutes.js";
 import truckingCompanyRoutes from "./routes/truckingCompanyRoutes.js";
 import shipRoutes from "./routes/shipRoutes.js";
+import containerRoutes from "./routes/containerRoutes.js";
 import truckRoutes from "./routes/truckRoutes.js";
 import bookingRoutes from "./routes/bookingRoutes.js";
 
@@ -31,6 +32,7 @@ app.use("/users", userRoutes);
 app.use("/shipping-lines", shippingLineRoutes);
 app.use("/trucking-companies", truckingCompanyRoutes);
 app.use("/ships", shipRoutes);
+app.use("/containers", containerRoutes);
 app.use("/trucks", truckRoutes);
 app.use("/bookings", bookingRoutes);
 
