@@ -133,16 +133,15 @@ async function createTables() {
 
         await pool.query(`
       CREATE TABLE IF NOT EXISTS containers (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  shipping_line_id UUID NOT NULL REFERENCES shipping_lines(id) ON DELETE CASCADE,
-  size container_type NOT NULL,
-  van_number VARCHAR(100) NOT NULL,
-  is_returned BOOLEAN DEFAULT TRUE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (shipping_line_id, van_number)
-);
-
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        shipping_line_id UUID NOT NULL REFERENCES shipping_lines(id) ON DELETE CASCADE,
+        size container_type NOT NULL,
+        van_number VARCHAR(100) NOT NULL,
+        is_returned BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE (shipping_line_id, van_number)
+      );
     `);
 
         // ==================== TRUCKING ====================
@@ -202,9 +201,12 @@ async function createTables() {
         last_name VARCHAR(100),
         phone VARCHAR(20),
 
+        consignee VARCHAR(150) NOT NULL,
+        consignee_name VARCHAR(100),
+        consignee_phone VARCHAR(20),
+
         shipping_line_id UUID NOT NULL REFERENCES shipping_lines(id) ON DELETE CASCADE,
         ship_id UUID REFERENCES ships(id) ON DELETE SET NULL,
-        container_id UUID REFERENCES containers(id) ON DELETE SET NULL,
         quantity INTEGER DEFAULT 1,
         booking_mode booking_mode NOT NULL,
         commodity VARCHAR(200) NOT NULL,
@@ -234,6 +236,19 @@ async function createTables() {
       );
     `);
 
+        // for multiple containers per booking
+        await pool.query(`
+      CREATE TABLE IF NOT EXISTS booking_containers (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+        container_id UUID NOT NULL REFERENCES containers(id) ON DELETE CASCADE,
+        sequence_number INTEGER NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        UNIQUE(booking_id, sequence_number)
+      );
+    `);
+
         await pool.query(`
       CREATE TABLE IF NOT EXISTS booking_details (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -252,6 +267,14 @@ async function createTables() {
       );
     `);
 
+        // ==================== INDEXES ====================
+        await pool.query(`
+      CREATE INDEX IF NOT EXISTS idx_containers_is_returned ON containers(is_returned);
+      CREATE INDEX IF NOT EXISTS idx_containers_shipping_line_returned ON containers(shipping_line_id, is_returned);
+      CREATE INDEX IF NOT EXISTS idx_booking_containers_booking_id ON booking_containers(booking_id);
+      CREATE INDEX IF NOT EXISTS idx_booking_containers_container_id ON booking_containers(container_id);
+    `);
+
         // ==================== TRIGGERS ====================
         const tablesForTrigger = [
             "users",
@@ -266,7 +289,8 @@ async function createTables() {
             "trucks",
             "truck_details",
             "bookings",
-            "booking_details"
+            "booking_details",
+            "booking_containers"
         ];
 
         for (const t of tablesForTrigger) {
