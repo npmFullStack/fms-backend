@@ -1,4 +1,4 @@
-// models/Booking.js - Updated to remove booking_date
+// models/Booking.js 
 import { pool } from "../db/index.js";
 
 export const createBooking = async bookingData => {
