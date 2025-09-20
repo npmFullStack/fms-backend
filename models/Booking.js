@@ -1,4 +1,4 @@
-// models/Booking.js - Updated version
+// models/Booking.js - Updated version with address fields
 import { pool } from "../db/index.js";
 
 export const createBooking = async bookingData => {
@@ -24,8 +24,17 @@ export const createBooking = async bookingData => {
       commodity,
       origin_port,
       destination_port,
+      // New address fields
+      pickup_province,
+      pickup_city,
+      pickup_barangay,
+      pickup_street,
       pickup_lat,
       pickup_lng,
+      delivery_province,
+      delivery_city,
+      delivery_barangay,
+      delivery_street,
       delivery_lat,
       delivery_lng,
       preferred_departure,
@@ -39,7 +48,11 @@ export const createBooking = async bookingData => {
         consignee, consignee_name, consignee_phone,
         shipping_line_id, ship_id, quantity, booking_mode,
         commodity, origin_port, destination_port,
-        pickup_lat, pickup_lng, delivery_lat, delivery_lng,
+        -- New address fields
+        pickup_province, pickup_city, pickup_barangay, pickup_street,
+        pickup_lat, pickup_lng,
+        delivery_province, delivery_city, delivery_barangay, delivery_street,
+        delivery_lat, delivery_lng,
         preferred_departure, preferred_delivery,
         booking_number, hwb_number
       )
@@ -48,8 +61,12 @@ export const createBooking = async bookingData => {
         $6, $7, $8,
         $9, $10, $11, $12,
         $13, $14, $15,
+        -- New address fields
         $16, $17, $18, $19,
         $20, $21,
+        $22, $23, $24, $25,
+        $26, $27,
+        $28, $29,
         'BKG-' || LPAD(nextval('booking_number_seq')::text, 4, '0'),
         'HWB-' || LPAD(nextval('hwb_number_seq')::text, 4, '0')
       )
@@ -59,7 +76,11 @@ export const createBooking = async bookingData => {
         consignee, consignee_name, consignee_phone,
         shipping_line_id, ship_id, quantity, booking_mode,
         commodity, origin_port, destination_port,
-        pickup_lat, pickup_lng, delivery_lat, delivery_lng,
+        // New address fields
+        pickup_province, pickup_city, pickup_barangay, pickup_street,
+        pickup_lat, pickup_lng,
+        delivery_province, delivery_city, delivery_barangay, delivery_street,
+        delivery_lat, delivery_lng,
         preferred_departure, preferred_delivery
       ]
     );
@@ -116,8 +137,17 @@ export const updateBooking = async (id, bookingData) => {
       commodity,
       origin_port,
       destination_port,
+      // New address fields
+      pickup_province,
+      pickup_city,
+      pickup_barangay,
+      pickup_street,
       pickup_lat,
       pickup_lng,
+      delivery_province,
+      delivery_city,
+      delivery_barangay,
+      delivery_street,
       delivery_lat,
       delivery_lng,
       preferred_departure,
@@ -143,23 +173,36 @@ export const updateBooking = async (id, bookingData) => {
         commodity = $12,
         origin_port = $13,
         destination_port = $14,
-        pickup_lat = $15,
-        pickup_lng = $16,
-        delivery_lat = $17,
-        delivery_lng = $18,
-        preferred_departure = $19,
-        preferred_delivery = $20,
-        status = $21,
-        payment_status = $22,
+        -- New address fields
+        pickup_province = $15,
+        pickup_city = $16,
+        pickup_barangay = $17,
+        pickup_street = $18,
+        pickup_lat = $19,
+        pickup_lng = $20,
+        delivery_province = $21,
+        delivery_city = $22,
+        delivery_barangay = $23,
+        delivery_street = $24,
+        delivery_lat = $25,
+        delivery_lng = $26,
+        preferred_departure = $27,
+        preferred_delivery = $28,
+        status = $29,
+        payment_status = $30,
         updated_at = NOW()
-      WHERE id = $23
+      WHERE id = $31
       RETURNING *`,
       [
         shipper, first_name, last_name, phone,
         consignee, consignee_name, consignee_phone,
         shipping_line_id, ship_id, quantity, booking_mode,
         commodity, origin_port, destination_port,
-        pickup_lat, pickup_lng, delivery_lat, delivery_lng,
+        // New address fields
+        pickup_province, pickup_city, pickup_barangay, pickup_street,
+        pickup_lat, pickup_lng,
+        delivery_province, delivery_city, delivery_barangay, delivery_street,
+        delivery_lat, delivery_lng,
         preferred_departure, preferred_delivery,
         status, payment_status, id
       ]
