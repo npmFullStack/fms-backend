@@ -1,49 +1,49 @@
-// models/Booking.js - Updated version with address fields
+// models/Booking.js
 import { pool } from "../db/index.js";
 
 export const createBooking = async bookingData => {
-  const client = await pool.connect();
-  
-  try {
-    await client.query('BEGIN');
-    
-    const {
-      user_id,
-      shipper,
-      first_name,
-      last_name,
-      phone,
-      consignee,
-      consignee_name,
-      consignee_phone,
-      shipping_line_id,
-      ship_id,
-      container_ids = [], // Array of container IDs
-      quantity,
-      booking_mode,
-      commodity,
-      origin_port,
-      destination_port,
-      // New address fields
-      pickup_province,
-      pickup_city,
-      pickup_barangay,
-      pickup_street,
-      pickup_lat,
-      pickup_lng,
-      delivery_province,
-      delivery_city,
-      delivery_barangay,
-      delivery_street,
-      delivery_lat,
-      delivery_lng,
-      preferred_departure,
-      preferred_delivery
-    } = bookingData;
+    const client = await pool.connect();
 
-    // Create the main booking record
-    const bookingResult = await client.query(
-      `INSERT INTO bookings (
+    try {
+        await client.query("BEGIN");
+
+        const {
+            user_id,
+            shipper,
+            first_name,
+            last_name,
+            phone,
+            consignee,
+            consignee_name,
+            consignee_phone,
+            shipping_line_id,
+            ship_id,
+            container_ids = [], // Array of container IDs
+            quantity,
+            booking_mode,
+            commodity,
+            origin_port,
+            destination_port,
+            // New address fields
+            pickup_province,
+            pickup_city,
+            pickup_barangay,
+            pickup_street,
+            pickup_lat,
+            pickup_lng,
+            delivery_province,
+            delivery_city,
+            delivery_barangay,
+            delivery_street,
+            delivery_lat,
+            delivery_lng,
+            preferred_departure,
+            preferred_delivery
+        } = bookingData;
+
+        // Create the main booking record
+        const bookingResult = await client.query(
+            `INSERT INTO bookings (
         user_id, shipper, first_name, last_name, phone,
         consignee, consignee_name, consignee_phone,
         shipping_line_id, ship_id, quantity, booking_mode,
@@ -71,94 +71,113 @@ export const createBooking = async bookingData => {
         'HWB-' || LPAD(nextval('hwb_number_seq')::text, 4, '0')
       )
       RETURNING *`,
-      [
-        user_id, shipper, first_name, last_name, phone,
-        consignee, consignee_name, consignee_phone,
-        shipping_line_id, ship_id, quantity, booking_mode,
-        commodity, origin_port, destination_port,
-        // New address fields
-        pickup_province, pickup_city, pickup_barangay, pickup_street,
-        pickup_lat, pickup_lng,
-        delivery_province, delivery_city, delivery_barangay, delivery_street,
-        delivery_lat, delivery_lng,
-        preferred_departure, preferred_delivery
-      ]
-    );
+            [
+                user_id,
+                shipper,
+                first_name,
+                last_name,
+                phone,
+                consignee,
+                consignee_name,
+                consignee_phone,
+                shipping_line_id,
+                ship_id,
+                quantity,
+                booking_mode,
+                commodity,
+                origin_port,
+                destination_port,
+                // New address fields
+                pickup_province,
+                pickup_city,
+                pickup_barangay,
+                pickup_street,
+                pickup_lat,
+                pickup_lng,
+                delivery_province,
+                delivery_city,
+                delivery_barangay,
+                delivery_street,
+                delivery_lat,
+                delivery_lng,
+                preferred_departure,
+                preferred_delivery
+            ]
+        );
 
-    const booking = bookingResult.rows[0];
+        const booking = bookingResult.rows[0];
 
-    // Insert container associations if provided
-    if (container_ids && container_ids.length > 0) {
-      for (let i = 0; i < container_ids.length; i++) {
-        await client.query(
-          `INSERT INTO booking_containers (booking_id, container_id, sequence_number)
+        // Insert container associations if provided
+        if (container_ids && container_ids.length > 0) {
+            for (let i = 0; i < container_ids.length; i++) {
+                await client.query(
+                    `INSERT INTO booking_containers (booking_id, container_id, sequence_number)
            VALUES ($1, $2, $3)`,
-          [booking.id, container_ids[i], i + 1]
-        );
+                    [booking.id, container_ids[i], i + 1]
+                );
 
-        // Mark container as not returned (in use)
-        await client.query(
-          `UPDATE containers SET is_returned = FALSE WHERE id = $1`,
-          [container_ids[i]]
-        );
-      }
+                // Mark container as not returned (in use)
+                await client.query(
+                    `UPDATE containers SET is_returned = FALSE WHERE id = $1`,
+                    [container_ids[i]]
+                );
+            }
+        }
+
+        await client.query("COMMIT");
+        return booking;
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
     }
-
-    await client.query('COMMIT');
-    return booking;
-    
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
 };
 
 export const updateBooking = async (id, bookingData) => {
-  const client = await pool.connect();
-  
-  try {
-    await client.query('BEGIN');
-    
-    const {
-      shipper,
-      first_name,
-      last_name,
-      phone,
-      consignee,
-      consignee_name,
-      consignee_phone,
-      shipping_line_id,
-      ship_id,
-      container_ids = [],
-      quantity,
-      booking_mode,
-      commodity,
-      origin_port,
-      destination_port,
-      // New address fields
-      pickup_province,
-      pickup_city,
-      pickup_barangay,
-      pickup_street,
-      pickup_lat,
-      pickup_lng,
-      delivery_province,
-      delivery_city,
-      delivery_barangay,
-      delivery_street,
-      delivery_lat,
-      delivery_lng,
-      preferred_departure,
-      preferred_delivery,
-      status,
-      payment_status
-    } = bookingData;
+    const client = await pool.connect();
 
-    // Update the main booking record
-    const result = await client.query(
-      `UPDATE bookings SET
+    try {
+        await client.query("BEGIN");
+
+        const {
+            shipper,
+            first_name,
+            last_name,
+            phone,
+            consignee,
+            consignee_name,
+            consignee_phone,
+            shipping_line_id,
+            ship_id,
+            container_ids = [],
+            quantity,
+            booking_mode,
+            commodity,
+            origin_port,
+            destination_port,
+            // New address fields
+            pickup_province,
+            pickup_city,
+            pickup_barangay,
+            pickup_street,
+            pickup_lat,
+            pickup_lng,
+            delivery_province,
+            delivery_city,
+            delivery_barangay,
+            delivery_street,
+            delivery_lat,
+            delivery_lng,
+            preferred_departure,
+            preferred_delivery,
+            status,
+            payment_status
+        } = bookingData;
+
+        // Update the main booking record
+        const result = await client.query(
+            `UPDATE bookings SET
         shipper = $1,
         first_name = $2,
         last_name = $3,
@@ -193,71 +212,91 @@ export const updateBooking = async (id, bookingData) => {
         updated_at = NOW()
       WHERE id = $31
       RETURNING *`,
-      [
-        shipper, first_name, last_name, phone,
-        consignee, consignee_name, consignee_phone,
-        shipping_line_id, ship_id, quantity, booking_mode,
-        commodity, origin_port, destination_port,
-        // New address fields
-        pickup_province, pickup_city, pickup_barangay, pickup_street,
-        pickup_lat, pickup_lng,
-        delivery_province, delivery_city, delivery_barangay, delivery_street,
-        delivery_lat, delivery_lng,
-        preferred_departure, preferred_delivery,
-        status, payment_status, id
-      ]
-    );
-
-    // If container_ids are provided, update container associations
-    if (container_ids && container_ids.length > 0) {
-      // First, get existing containers and mark them as returned
-      const existingContainers = await client.query(
-        `SELECT container_id FROM booking_containers WHERE booking_id = $1`,
-        [id]
-      );
-
-      for (const row of existingContainers.rows) {
-        await client.query(
-          `UPDATE containers SET is_returned = TRUE WHERE id = $1`,
-          [row.container_id]
+            [
+                shipper,
+                first_name,
+                last_name,
+                phone,
+                consignee,
+                consignee_name,
+                consignee_phone,
+                shipping_line_id,
+                ship_id,
+                quantity,
+                booking_mode,
+                commodity,
+                origin_port,
+                destination_port,
+                // New address fields
+                pickup_province,
+                pickup_city,
+                pickup_barangay,
+                pickup_street,
+                pickup_lat,
+                pickup_lng,
+                delivery_province,
+                delivery_city,
+                delivery_barangay,
+                delivery_street,
+                delivery_lat,
+                delivery_lng,
+                preferred_departure,
+                preferred_delivery,
+                status,
+                payment_status,
+                id
+            ]
         );
-      }
 
-      // Delete existing container associations
-      await client.query(
-        `DELETE FROM booking_containers WHERE booking_id = $1`,
-        [id]
-      );
+        // If container_ids are provided, update container associations
+        if (container_ids && container_ids.length > 0) {
+            // First, get existing containers and mark them as returned
+            const existingContainers = await client.query(
+                `SELECT container_id FROM booking_containers WHERE booking_id = $1`,
+                [id]
+            );
 
-      // Insert new container associations
-      for (let i = 0; i < container_ids.length; i++) {
-        await client.query(
-          `INSERT INTO booking_containers (booking_id, container_id, sequence_number)
+            for (const row of existingContainers.rows) {
+                await client.query(
+                    `UPDATE containers SET is_returned = TRUE WHERE id = $1`,
+                    [row.container_id]
+                );
+            }
+
+            // Delete existing container associations
+            await client.query(
+                `DELETE FROM booking_containers WHERE booking_id = $1`,
+                [id]
+            );
+
+            // Insert new container associations
+            for (let i = 0; i < container_ids.length; i++) {
+                await client.query(
+                    `INSERT INTO booking_containers (booking_id, container_id, sequence_number)
            VALUES ($1, $2, $3)`,
-          [id, container_ids[i], i + 1]
-        );
+                    [id, container_ids[i], i + 1]
+                );
 
-        // Mark new containers as not returned
-        await client.query(
-          `UPDATE containers SET is_returned = FALSE WHERE id = $1`,
-          [container_ids[i]]
-        );
-      }
+                // Mark new containers as not returned
+                await client.query(
+                    `UPDATE containers SET is_returned = FALSE WHERE id = $1`,
+                    [container_ids[i]]
+                );
+            }
+        }
+
+        await client.query("COMMIT");
+        return result.rows[0];
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
     }
-
-    await client.query('COMMIT');
-    return result.rows[0];
-    
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
 };
 
 export const getAllBookings = async () => {
-  const result = await pool.query(`
+    const result = await pool.query(`
     SELECT
       b.*,
       u.email AS created_by_email,
@@ -288,12 +327,12 @@ export const getAllBookings = async () => {
     GROUP BY b.id, u.email, ud.first_name, ud.last_name, sl.name, s.vessel_number
     ORDER BY b.created_at DESC
   `);
-  return result.rows;
+    return result.rows;
 };
 
 export const getBookingById = async id => {
-  const result = await pool.query(
-    `
+    const result = await pool.query(
+        `
     SELECT
       b.*,
       u.email AS created_by_email,
@@ -324,53 +363,73 @@ export const getBookingById = async id => {
     WHERE b.id = $1
     GROUP BY b.id, u.email, ud.first_name, ud.last_name, sl.name, s.vessel_number
     `,
-    [id]
-  );
-  return result.rows[0];
+        [id]
+    );
+    return result.rows[0];
 };
 
 export const deleteBooking = async id => {
-  const client = await pool.connect();
-  
-  try {
-    await client.query('BEGIN');
-    
-    // Get containers to mark as returned
-    const containers = await client.query(
-      `SELECT container_id FROM booking_containers WHERE booking_id = $1`,
-      [id]
-    );
+    const client = await pool.connect();
 
-    // Mark containers as returned
-    for (const row of containers.rows) {
-      await client.query(
-        `UPDATE containers SET is_returned = TRUE WHERE id = $1`,
-        [row.container_id]
-      );
+    try {
+        await client.query("BEGIN");
+
+        // Get containers to mark as returned
+        const containers = await client.query(
+            `SELECT container_id FROM booking_containers WHERE booking_id = $1`,
+            [id]
+        );
+
+        // Mark containers as returned
+        for (const row of containers.rows) {
+            await client.query(
+                `UPDATE containers SET is_returned = TRUE WHERE id = $1`,
+                [row.container_id]
+            );
+        }
+
+        // Delete booking (cascade will handle booking_containers)
+        await client.query("DELETE FROM bookings WHERE id = $1", [id]);
+
+        await client.query("COMMIT");
+        return { id };
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
     }
-
-    // Delete booking (cascade will handle booking_containers)
-    await client.query("DELETE FROM bookings WHERE id = $1", [id]);
-    
-    await client.query('COMMIT');
-    return { id };
-    
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
 };
 
 // New function to get available containers for a shipping line
-export const getAvailableContainers = async (shipping_line_id) => {
-  const result = await pool.query(
-    `SELECT id, size, van_number, created_at
+export const getAvailableContainers = async shipping_line_id => {
+    const result = await pool.query(
+        `SELECT id, size, van_number, created_at
      FROM containers 
      WHERE shipping_line_id = $1 AND is_returned = TRUE
      ORDER BY size, van_number`,
-    [shipping_line_id]
-  );
-  return result.rows;
+        [shipping_line_id]
+    );
+    return result.rows;
+};
+
+
+// Find booking by booking_number or hwb_number (public search)
+export const findByNumberOrHwb = async query => {
+    const result = await pool.query(
+        `
+        SELECT
+          b.*,
+          sl.name AS shipping_line_name,
+          s.vessel_number AS ship_vessel_number
+        FROM bookings b
+        LEFT JOIN shipping_lines sl ON b.shipping_line_id = sl.id
+        LEFT JOIN ships s ON b.ship_id = s.id
+        WHERE b.booking_number = $1 OR b.hwb_number = $1
+        LIMIT 1
+        `,
+        [query]
+    );
+
+    return result.rows[0] || null;
 };

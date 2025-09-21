@@ -1,28 +1,28 @@
-// routes/bookingRoutes.js - Updated version
 import express from "express";
-import { verifyTokenMiddleware } from "../middleware/authMiddlewares.js";
 import {
   createBooking,
   getBookings,
   getBooking,
   updateBooking,
   deleteBooking,
-  getAvailableContainers, // New import
+  getAvailableContainers,
+  searchBookingPublic, // new
 } from "../controllers/bookingController.js";
+import { verifyTokenMiddleware } from "../middleware/authMiddlewares.js";
 
 const router = express.Router();
 
-// All routes are protected
+// 🚨 Public route (no verifyTokenMiddleware)
+router.get("/public/search/:query", searchBookingPublic);
+
+// ✅ Protected routes
 router.use(verifyTokenMiddleware);
 
-// Routes
 router.get("/", getBookings);
 router.get("/:id", getBooking);
 router.post("/", createBooking);
 router.patch("/:id", updateBooking);
 router.delete("/:id", deleteBooking);
-
-// New route to get available containers for a shipping line
 router.get("/available-containers/:shipping_line_id", getAvailableContainers);
 
 export default router;

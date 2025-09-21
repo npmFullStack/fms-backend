@@ -112,3 +112,23 @@ export const getAvailableContainers = async (req, res) => {
     });
   }
 };
+
+
+// Public search booking by booking_number or hwb_number (no auth required)
+export const searchBookingPublic = async (req, res) => {
+  try {
+    const { query } = req.params;
+    const booking = await Booking.findByNumberOrHwb(query); // we'll add this in the model
+
+    if (!booking) {
+      return res.status(404).json({ error: "Booking not found" });
+    }
+
+    res.json({ booking });
+  } catch (err) {
+    res.status(500).json({
+      message: "Failed to fetch booking",
+      error: err.message,
+    });
+  }
+};
