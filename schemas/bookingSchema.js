@@ -9,11 +9,11 @@ export const bookingSchema = z.object({
     consignee: z.string().min(1, "Consignee is required"),
     consignee_name: z.string().optional().nullable(),
     consignee_phone: z.string().optional().nullable(),
-
+    
     shipping_line_id: z.string().uuid(),
     ship_id: z.string().uuid().optional().nullable(),
     container_ids: z.array(z.string().uuid()).optional().default([]),
-
+    
     booking_mode: z.enum([
         "DOOR_TO_DOOR",
         "PIER_TO_PIER",
@@ -25,8 +25,8 @@ export const bookingSchema = z.object({
     quantity: z.number().int().positive(),
     origin_port: z.string().min(2),
     destination_port: z.string().min(2),
-
-    // New address fields
+    
+    // Address fields (no lat/lng)
     pickup_province: z.string().optional().nullable(),
     pickup_city: z.string().optional().nullable(),
     pickup_barangay: z.string().optional().nullable(),
@@ -35,17 +35,12 @@ export const bookingSchema = z.object({
     delivery_city: z.string().optional().nullable(),
     delivery_barangay: z.string().optional().nullable(),
     delivery_street: z.string().optional().nullable(),
-
-    pickup_lat: z.number().optional().nullable(),
-    pickup_Ing: z.number().optional().nullable(),
-    delivery_lat: z.number().optional().nullable(),
-    delivery_Ing: z.number().optional().nullable(),
-
-    preferred_departure: z.string().min(1),
-    preferred_delivery: z.string().optional().nullable(),
+    
     status: z
-        .enum(["PENDING", "PICKUP", "IN_PORT", "IN_TRANSIT", "DELIVERED"])
-        .default("PENDING")
+        .enum(["PICKUP_SCHEDULED", "LOADED_TO_TRUCK", "ARRIVED_ORIGIN_PORT", 
+               "LOADED_TO_SHIP", "IN_TRANSIT", "ARRIVED_DESTINATION_PORT", 
+               "OUT_FOR_DELIVERY", "DELIVERED"])
+        .default("PICKUP_SCHEDULED")
 });
 
 export const bookingUpdateSchema = bookingSchema.partial();

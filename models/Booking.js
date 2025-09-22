@@ -3,10 +3,10 @@ import { pool } from "../db/index.js";
 
 export const createBooking = async bookingData => {
     const client = await pool.connect();
-
+    
     try {
         await client.query("BEGIN");
-
+        
         const {
             user_id,
             shipper,
@@ -18,59 +18,49 @@ export const createBooking = async bookingData => {
             consignee_phone,
             shipping_line_id,
             ship_id,
-            container_ids = [], // Array of container IDs
+            container_ids = [],
             quantity,
             booking_mode,
             commodity,
             origin_port,
             destination_port,
-            // New address fields
+            
+            // Address fields (no lat/lng)
             pickup_province,
             pickup_city,
             pickup_barangay,
             pickup_street,
-            pickup_lat,
-            pickup_lng,
             delivery_province,
             delivery_city,
             delivery_barangay,
-            delivery_street,
-            delivery_lat,
-            delivery_lng,
-            preferred_departure,
-            preferred_delivery
+            delivery_street
+            
         } = bookingData;
-
+        
         // Create the main booking record
         const bookingResult = await client.query(
             `INSERT INTO bookings (
-        user_id, shipper, first_name, last_name, phone,
-        consignee, consignee_name, consignee_phone,
-        shipping_line_id, ship_id, quantity, booking_mode,
-        commodity, origin_port, destination_port,
-        -- New address fields
-        pickup_province, pickup_city, pickup_barangay, pickup_street,
-        pickup_lat, pickup_lng,
-        delivery_province, delivery_city, delivery_barangay, delivery_street,
-        delivery_lat, delivery_lng,
-        preferred_departure, preferred_delivery,
-        booking_number, hwb_number
-      )
-      VALUES (
-        $1, $2, $3, $4, $5,
-        $6, $7, $8,
-        $9, $10, $11, $12,
-        $13, $14, $15,
-        -- New address fields
-        $16, $17, $18, $19,
-        $20, $21,
-        $22, $23, $24, $25,
-        $26, $27,
-        $28, $29,
-        'BKG-' || LPAD(nextval('booking_number_seq')::text, 4, '0'),
-        'HWB-' || LPAD(nextval('hwb_number_seq')::text, 4, '0')
-      )
-      RETURNING *`,
+                user_id, shipper, first_name, last_name, phone,
+                consignee, consignee_name, consignee_phone,
+                shipping_line_id, ship_id, quantity, booking_mode,
+                commodity, origin_port, destination_port,
+                -- Address fields
+                pickup_province, pickup_city, pickup_barangay, pickup_street,
+                delivery_province, delivery_city, delivery_barangay, delivery_street,
+                booking_number, hwb_number
+            )
+            VALUES (
+                $1, $2, $3, $4, $5,
+                $6, $7, $8,
+                $9, $10, $11, $12,
+                $13, $14, $15,
+                -- Address fields
+                $16, $17, $18, $19,
+                $20, $21, $22, $23,
+                'BKG-' || LPAD(nextval('booking_number_seq')::text, 4, '0'),
+                'HWB-' || LPAD(nextval('hwb_number_seq')::text, 4, '0')
+            )
+            RETURNING *`,
             [
                 user_id,
                 shipper,
@@ -87,43 +77,35 @@ export const createBooking = async bookingData => {
                 commodity,
                 origin_port,
                 destination_port,
-                // New address fields
+                // Address fields
                 pickup_province,
                 pickup_city,
                 pickup_barangay,
                 pickup_street,
-                pickup_lat,
-                pickup_lng,
                 delivery_province,
                 delivery_city,
                 delivery_barangay,
-                delivery_street,
-                delivery_lat,
-                delivery_lng,
-                preferred_departure,
-                preferred_delivery
+                delivery_street
             ]
         );
-
+        
         const booking = bookingResult.rows[0];
-
+        
         // Insert container associations if provided
         if (container_ids && container_ids.length > 0) {
             for (let i = 0; i < container_ids.length; i++) {
                 await client.query(
-                    `INSERT INTO booking_containers (booking_id, container_id, sequence_number)
-           VALUES ($1, $2, $3)`,
+                    'INSERT INTO booking_containers (booking_id, container_id, sequence_number) VALUES ($1, $2, $3)',
                     [booking.id, container_ids[i], i + 1]
                 );
-
                 // Mark container as not returned (in use)
                 await client.query(
-                    `UPDATE containers SET is_returned = FALSE WHERE id = $1`,
+                    'UPDATE containers SET is_returned = FALSE WHERE id = $1',
                     [container_ids[i]]
                 );
             }
         }
-
+        
         await client.query("COMMIT");
         return booking;
     } catch (error) {
@@ -136,10 +118,10 @@ export const createBooking = async bookingData => {
 
 export const updateBooking = async (id, bookingData) => {
     const client = await pool.connect();
-
+    
     try {
         await client.query("BEGIN");
-
+        
         const {
             shipper,
             first_name,
@@ -156,62 +138,50 @@ export const updateBooking = async (id, bookingData) => {
             commodity,
             origin_port,
             destination_port,
-            // New address fields
+            // Address fields
             pickup_province,
             pickup_city,
             pickup_barangay,
             pickup_street,
-            pickup_lat,
-            pickup_lng,
             delivery_province,
             delivery_city,
             delivery_barangay,
             delivery_street,
-            delivery_lat,
-            delivery_lng,
-            preferred_departure,
-            preferred_delivery,
             status,
             payment_status
         } = bookingData;
-
+        
         // Update the main booking record
         const result = await client.query(
             `UPDATE bookings SET
-        shipper = $1,
-        first_name = $2,
-        last_name = $3,
-        phone = $4,
-        consignee = $5,
-        consignee_name = $6,
-        consignee_phone = $7,
-        shipping_line_id = $8,
-        ship_id = $9,
-        quantity = $10,
-        booking_mode = $11,
-        commodity = $12,
-        origin_port = $13,
-        destination_port = $14,
-        -- New address fields
-        pickup_province = $15,
-        pickup_city = $16,
-        pickup_barangay = $17,
-        pickup_street = $18,
-        pickup_lat = $19,
-        pickup_lng = $20,
-        delivery_province = $21,
-        delivery_city = $22,
-        delivery_barangay = $23,
-        delivery_street = $24,
-        delivery_lat = $25,
-        delivery_lng = $26,
-        preferred_departure = $27,
-        preferred_delivery = $28,
-        status = $29,
-        payment_status = $30,
-        updated_at = NOW()
-      WHERE id = $31
-      RETURNING *`,
+                shipper = $1,
+                first_name = $2,
+                last_name = $3,
+                phone = $4,
+                consignee = $5,
+                consignee_name = $6,
+                consignee_phone = $7,
+                shipping_line_id = $8,
+                ship_id = $9,
+                quantity = $10,
+                booking_mode = $11,
+                commodity = $12,
+                origin_port = $13,
+                destination_port = $14,
+                -- Address fields
+                pickup_province = $15,
+                pickup_city = $16,
+                pickup_barangay = $17,
+                pickup_street = $18,
+                delivery_province = $19,
+                delivery_city = $20,
+                delivery_barangay = $21,
+                delivery_street = $22,
+                status = $23,
+                payment_status = $24,
+                updated_at = NOW()
+            WHERE id = $25
+            RETURNING *`,
             [
                 shipper,
                 first_name,
@@ -227,64 +197,56 @@ export const updateBooking = async (id, bookingData) => {
                 commodity,
                 origin_port,
                 destination_port,
-                // New address fields
+                // Address fields
                 pickup_province,
                 pickup_city,
                 pickup_barangay,
                 pickup_street,
-                pickup_lat,
-                pickup_lng,
                 delivery_province,
                 delivery_city,
                 delivery_barangay,
                 delivery_street,
-                delivery_lat,
-                delivery_lng,
-                preferred_departure,
-                preferred_delivery,
                 status,
                 payment_status,
                 id
             ]
         );
-
+        
         // If container_ids are provided, update container associations
         if (container_ids && container_ids.length > 0) {
             // First, get existing containers and mark them as returned
             const existingContainers = await client.query(
-                `SELECT container_id FROM booking_containers WHERE booking_id = $1`,
+                'SELECT container_id FROM booking_containers WHERE booking_id = $1',
                 [id]
             );
-
             for (const row of existingContainers.rows) {
                 await client.query(
-                    `UPDATE containers SET is_returned = TRUE WHERE id = $1`,
+                    'UPDATE containers SET is_returned = TRUE WHERE id = $1',
                     [row.container_id]
                 );
             }
-
+            
             // Delete existing container associations
             await client.query(
-                `DELETE FROM booking_containers WHERE booking_id = $1`,
+                'DELETE FROM booking_containers WHERE booking_id = $1',
                 [id]
             );
-
+            
             // Insert new container associations
             for (let i = 0; i < container_ids.length; i++) {
                 await client.query(
-                    `INSERT INTO booking_containers (booking_id, container_id, sequence_number)
-           VALUES ($1, $2, $3)`,
+                    'INSERT INTO booking_containers (booking_id, container_id, sequence_number) VALUES ($1, $2, $3)',
                     [id, container_ids[i], i + 1]
                 );
-
+                
                 // Mark new containers as not returned
                 await client.query(
-                    `UPDATE containers SET is_returned = FALSE WHERE id = $1`,
+                    'UPDATE containers SET is_returned = FALSE WHERE id = $1',
                     [container_ids[i]]
                 );
             }
         }
-
+        
         await client.query("COMMIT");
         return result.rows[0];
     } catch (error) {

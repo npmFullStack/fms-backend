@@ -41,15 +41,19 @@ async function createTables() {
           CREATE TYPE payment_status AS ENUM ('PENDING', 'PAID', 'OVERDUE');
         END IF;
 
-        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'booking_status') THEN
-          CREATE TYPE booking_status AS ENUM (
-            'PENDING',
-            'PICKUP',
-            'IN_PORT',
-            'IN_TRANSIT',
-            'DELIVERED'
-          );
-        END IF;
+
+IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'booking_status') THEN
+CREATE TYPE booking_status AS ENUM (
+    'PICKUP_SCHEDULED',
+    'LOADED_TO_TRUCK',
+    'ARRIVED_ORIGIN_PORT',
+    'LOADED_TO_SHIP',
+    'IN_TRANSIT',
+    'ARRIVED_DESTINATION_PORT',
+    'OUT_FOR_DELIVERY',
+    'DELIVERED'
+);
+END IF;
       END $$;
     `);
 
@@ -188,63 +192,56 @@ async function createTables() {
     `);
 
         // ==================== BOOKINGS ====================
-await pool.query(`
+        await pool.query(`
   CREATE SEQUENCE IF NOT EXISTS booking_number_seq START 1;
   CREATE SEQUENCE IF NOT EXISTS hwb_number_seq START 1;
 
-  CREATE TABLE IF NOT EXISTS bookings (
+CREATE TABLE IF NOT EXISTS bookings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-
+    
     shipper VARCHAR(150) NOT NULL,
     first_name VARCHAR(100),
     last_name VARCHAR(100),
     phone VARCHAR(20),
-
+    
     consignee VARCHAR(150) NOT NULL,
     consignee_name VARCHAR(100),
     consignee_phone VARCHAR(20),
-
+    
     shipping_line_id UUID NOT NULL REFERENCES shipping_lines(id) ON DELETE CASCADE,
     ship_id UUID REFERENCES ships(id) ON DELETE SET NULL,
     quantity INTEGER DEFAULT 1,
     booking_mode booking_mode NOT NULL,
     commodity VARCHAR(200) NOT NULL,
-
+    
     origin_port VARCHAR(100) NOT NULL,
     destination_port VARCHAR(100) NOT NULL,
-
-    -- New address fields for pickup location
+  
     pickup_province VARCHAR(255),
     pickup_city VARCHAR(255),
     pickup_barangay VARCHAR(255),
     pickup_street VARCHAR(255),
-    pickup_lat DECIMAL(10,8),
-    pickup_lng DECIMAL(11,8),
     
-    -- New address fields for delivery location
     delivery_province VARCHAR(255),
     delivery_city VARCHAR(255),
     delivery_barangay VARCHAR(255),
     delivery_street VARCHAR(255),
-    delivery_lat DECIMAL(10,8),
-    delivery_lng DECIMAL(11,8),
+    
 
-    preferred_departure DATE NOT NULL,
-    preferred_delivery DATE,
     actual_departure DATE,
     actual_arrival DATE,
     actual_delivery DATE,
-
-    status booking_status DEFAULT 'PENDING',
+    
+    status booking_status DEFAULT 'PICKUP_SCHEDULED',
     payment_status payment_status DEFAULT 'PENDING',
-
+    
     booking_number VARCHAR(50) UNIQUE,
     hwb_number VARCHAR(50) UNIQUE,
-
+    
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-  );
+);
 `);
 
         // for multiple containers per booking
