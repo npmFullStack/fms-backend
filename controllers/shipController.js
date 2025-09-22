@@ -35,6 +35,18 @@ export const getShip = async (req, res) => {
   }
 };
 
+export const getShipsByLine = async (req, res) => {
+  try {
+    const { lineId } = req.params;
+    const ships = await Ship.getAllShips();
+    const filtered = ships.filter(ship => ship.shipping_line_id == lineId);
+    res.json({ ships: filtered });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+
 // Update ship (shipName + vesselNumber + remarks)
 export const updateShip = async (req, res) => {
   try {

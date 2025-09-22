@@ -5,7 +5,6 @@ import {
   getBooking,
   updateBooking,
   deleteBooking,
-  getAvailableContainers,
   searchBookingPublic, // new
 } from "../controllers/bookingController.js";
 import { verifyTokenMiddleware } from "../middleware/authMiddlewares.js";
@@ -23,6 +22,6 @@ router.get("/:id", getBooking);
 router.post("/", createBooking);
 router.patch("/:id", updateBooking);
 router.delete("/:id", deleteBooking);
-router.get("/available-containers/:shipping_line_id", getAvailableContainers);
+
 
 export default router;
