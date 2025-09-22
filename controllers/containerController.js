@@ -2,6 +2,7 @@ import {
     createContainer,
     getContainersByLine,
     getContainerById,
+    getAvailableContainer,
     updateContainer,
     deleteContainer
 } from "../models/Container.js";
@@ -61,5 +62,19 @@ export const removeContainer = async (req, res) => {
         res.json({ message: "Container deleted" });
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+};
+
+// New endpoint to get available containers for a shipping line
+export const getAvailableContainers = async (req, res) => {
+    try {
+        const { shipping_line_id } = req.params;
+        const containers = await getAvailableContainer(shipping_line_id);
+        res.json({ containers });
+    } catch (err) {
+        res.status(500).json({
+            message: "Failed to fetch available containers",
+            error: err.message
+        });
     }
 };

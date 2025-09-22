@@ -363,17 +363,6 @@ export const deleteBooking = async id => {
     }
 };
 
-// New function to get available containers for a shipping line
-export const getAvailableContainers = async shipping_line_id => {
-    const result = await pool.query(
-        `SELECT id, size, van_number, created_at
-     FROM containers 
-     WHERE shipping_line_id = $1 AND is_returned = TRUE
-     ORDER BY size, van_number`,
-        [shipping_line_id]
-    );
-    return result.rows;
-};
 
 
 // Find booking by booking_number or hwb_number (public search)
