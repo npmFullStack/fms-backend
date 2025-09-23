@@ -11,9 +11,6 @@ import { verifyTokenMiddleware } from "../middleware/authMiddlewares.js";
 
 const router = express.Router();
 
-// 🚨 Public route (no verifyTokenMiddleware)
-router.get("/public/search/:query", searchBookingPublic);
-
 // ✅ Protected routes
 router.use(verifyTokenMiddleware);
 
