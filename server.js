@@ -10,6 +10,7 @@ import shipRoutes from "./routes/shipRoutes.js";
 import containerRoutes from "./routes/containerRoutes.js";
 import truckRoutes from "./routes/truckRoutes.js";
 import bookingRoutes from "./routes/bookingRoutes.js";
+import courierRoutes from "./routes/courierRoutes.js";
 
 dotenv.config();
 
@@ -35,6 +36,7 @@ app.use("/ships", shipRoutes);
 app.use("/containers", containerRoutes);
 app.use("/trucks", truckRoutes);
 app.use("/bookings", bookingRoutes);
+app.use("/couriers", courierRoutes);
 
 // Simple health check
 app.get("/health", (req, res) => {

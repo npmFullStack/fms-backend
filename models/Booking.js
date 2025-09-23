@@ -362,25 +362,3 @@ export const deleteBooking = async id => {
         client.release();
     }
 };
-
-
-
-// Find booking by booking_number or hwb_number (public search)
-export const findByNumberOrHwb = async query => {
-    const result = await pool.query(
-        `
-        SELECT
-          b.*,
-          sl.name AS shipping_line_name,
-          s.vessel_number AS ship_vessel_number
-        FROM bookings b
-        LEFT JOIN shipping_lines sl ON b.shipping_line_id = sl.id
-        LEFT JOIN ships s ON b.ship_id = s.id
-        WHERE b.booking_number = $1 OR b.hwb_number = $1
-        LIMIT 1
-        `,
-        [query]
-    );
-
-    return result.rows[0] || null;
-};

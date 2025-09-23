@@ -1,4 +1,4 @@
-// controllers/bookingController.js - Updated version
+// controllers/bookingController.js
 import {
     bookingSchema,
     bookingUpdateSchema
@@ -105,8 +105,6 @@ export const deleteBooking = async (req, res) => {
         });
     }
 };
-
-
 
 // Public search booking by booking_number or hwb_number (no auth required)
 export const searchBookingPublic = async (req, res) => {
