@@ -1,10 +1,12 @@
-// routes/courierRoutes.js
 import express from "express";
-import { searchBookingPublic } from "../controllers/courierController.js";
+import { searchBookingPublic, updateBookingStatus } from "../controllers/courierController.js";
 
 const router = express.Router();
 
-// Public route (no authentication required)
+// Public search route
 router.get("/public/search/:query", searchBookingPublic);
+
+// Update booking status
+router.put("/:id/status", updateBookingStatus);
 
 export default router;
