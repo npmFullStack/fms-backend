@@ -217,7 +217,7 @@ CREATE TABLE IF NOT EXISTS bookings (
     
     origin_port VARCHAR(100) NOT NULL,
     destination_port VARCHAR(100) NOT NULL,
-  
+
     pickup_province VARCHAR(255),
     pickup_city VARCHAR(255),
     pickup_barangay VARCHAR(255),
@@ -227,7 +227,12 @@ CREATE TABLE IF NOT EXISTS bookings (
     delivery_city VARCHAR(255),
     delivery_barangay VARCHAR(255),
     delivery_street VARCHAR(255),
-    
+
+    -- truck related fields (moved from booking_details)
+    pickup_trucker_id UUID REFERENCES trucking_companies(id) ON DELETE SET NULL,
+    pickup_truck_id UUID REFERENCES trucks(id) ON DELETE SET NULL,
+    delivery_trucker_id UUID REFERENCES trucking_companies(id) ON DELETE SET NULL,
+    delivery_truck_id UUID REFERENCES trucks(id) ON DELETE SET NULL,
 
     actual_departure DATE,
     actual_arrival DATE,
@@ -241,8 +246,9 @@ CREATE TABLE IF NOT EXISTS bookings (
     
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-`);
+    
+      );
+    `);
 
         // for multiple containers per booking
         await pool.query(`
@@ -293,7 +299,6 @@ CREATE TABLE IF NOT EXISTS bookings (
             "trucks",
             "truck_details",
             "bookings",
-            "booking_details",
             "booking_containers"
         ];
 
