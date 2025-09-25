@@ -228,7 +228,7 @@ CREATE TABLE IF NOT EXISTS bookings (
     delivery_barangay VARCHAR(255),
     delivery_street VARCHAR(255),
 
-    -- truck related fields (moved from booking_details)
+
     pickup_trucker_id UUID REFERENCES trucking_companies(id) ON DELETE SET NULL,
     pickup_truck_id UUID REFERENCES trucks(id) ON DELETE SET NULL,
     delivery_trucker_id UUID REFERENCES trucking_companies(id) ON DELETE SET NULL,
@@ -260,20 +260,6 @@ CREATE TABLE IF NOT EXISTS bookings (
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         UNIQUE(booking_id, sequence_number)
-      );
-    `);
-
-        await pool.query(`
-      CREATE TABLE IF NOT EXISTS booking_details (
-        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
-        pickup_trucker_id UUID REFERENCES trucking_companies(id) ON DELETE SET NULL,
-        pickup_truck_id UUID REFERENCES trucks(id) ON DELETE SET NULL,
-        delivery_trucker_id UUID REFERENCES trucking_companies(id) ON DELETE SET NULL,
-        delivery_truck_id UUID REFERENCES trucks(id) ON DELETE SET NULL,
-
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
 
