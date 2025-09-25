@@ -31,9 +31,6 @@ async function createTables() {
           CREATE TYPE booking_mode AS ENUM (
             'DOOR_TO_DOOR',
             'PIER_TO_PIER',
-            'CY_TO_DOOR',
-            'DOOR_TO_CY',
-            'CY_TO_CY'
           );
         END IF;
 
