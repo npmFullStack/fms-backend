@@ -30,7 +30,7 @@ async function createTables() {
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'booking_mode') THEN
           CREATE TYPE booking_mode AS ENUM (
             'DOOR_TO_DOOR',
-            'PIER_TO_PIER',
+            'PIER_TO_PIER'
           );
         END IF;
 
@@ -259,6 +259,18 @@ CREATE TABLE IF NOT EXISTS bookings (
         UNIQUE(booking_id, sequence_number)
       );
     `);
+    
+    // ==================== BOOKING STATUS HISTORY ====================
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS booking_status_history (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+    status booking_status NOT NULL,
+    status_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+`);
+
 
         // ==================== INDEXES ====================
         await pool.query(`

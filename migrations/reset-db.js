@@ -15,6 +15,7 @@ async function resetDatabase() {
         await pool.query(`
       DROP TABLE IF EXISTS 
         booking_containers,
+        booking_status_history,
         bookings,
         truck_details,
         trucks,
