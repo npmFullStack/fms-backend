@@ -2,7 +2,7 @@ import express from "express";
 import {
     getShips,
     getShip,
-    getShipsByLine,   // ✅ import your new controller
+    getShipsByLine,
     createShip,
     updateShip,
     deleteShip

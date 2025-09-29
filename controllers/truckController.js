@@ -9,13 +9,13 @@ import {
 } from "../models/Truck.js";
 
 export const createTruck = async (req, res) => {
-  try {
-    const validated = truckSchema.parse(req.body);
-    const truck = await createTruckModel(validated);
-    res.status(201).json(truck);
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
+    try {
+        const validated = truckSchema.parse(req.body);
+        const truck = await createTruckModel(validated);
+        res.status(201).json(truck);
+    } catch (err) {
+        res.status(400).json({ error: err.message });
+    }
 };
 
 export const getTrucks = async (req, res) => {
