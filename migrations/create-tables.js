@@ -123,16 +123,6 @@ END IF;
     `);
 
         await pool.query(`
-      CREATE TABLE IF NOT EXISTS ship_details (
-        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        ship_id UUID NOT NULL UNIQUE REFERENCES ships(id) ON DELETE CASCADE,
-        remarks TEXT,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      );
-    `);
-
-        await pool.query(`
       CREATE TABLE IF NOT EXISTS containers (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
         shipping_line_id UUID NOT NULL REFERENCES shipping_lines(id) ON DELETE CASCADE,
@@ -175,16 +165,6 @@ END IF;
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         UNIQUE (trucking_company_id, name)
-      );
-    `);
-
-        await pool.query(`
-      CREATE TABLE IF NOT EXISTS truck_details (
-        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        truck_id UUID NOT NULL UNIQUE REFERENCES trucks(id) ON DELETE CASCADE,
-        remarks TEXT,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
 
@@ -259,9 +239,9 @@ CREATE TABLE IF NOT EXISTS bookings (
         UNIQUE(booking_id, sequence_number)
       );
     `);
-    
-    // ==================== BOOKING STATUS HISTORY ====================
-await pool.query(`
+
+        // ==================== BOOKING STATUS HISTORY ====================
+        await pool.query(`
   CREATE TABLE IF NOT EXISTS booking_status_history (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
@@ -270,7 +250,6 @@ await pool.query(`
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );
 `);
-
 
         // ==================== INDEXES ====================
         await pool.query(`
@@ -287,12 +266,10 @@ await pool.query(`
             "shipping_lines",
             "shipping_line_details",
             "ships",
-            "ship_details",
             "containers",
             "trucking_companies",
             "trucking_company_details",
             "trucks",
-            "truck_details",
             "bookings",
             "booking_containers"
         ];

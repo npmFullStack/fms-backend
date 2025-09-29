@@ -13,6 +13,4 @@ export const shipSchema = z.object({
     .string()
     .max(50, { message: "Vessel number cannot exceed 50 characters" })
     .min(1, { message: "Vessel number is required" }),
-
-  remarks: z.string().optional()
 });
