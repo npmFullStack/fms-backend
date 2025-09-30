@@ -1,3 +1,5 @@
+// models/Courier.js
+
 import { pool } from "../db/index.js";
 
 // 🔹 Find booking by number or HWB
