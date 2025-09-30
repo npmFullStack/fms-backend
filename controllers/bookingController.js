@@ -124,3 +124,76 @@ export const searchBookingPublic = async (req, res) => {
         });
     }
 };
+
+// Get booking status history
+export const getBookingHistory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const history = await Booking.getBookingStatusHistory(id);
+    res.json({ history });
+  } catch (err) {
+    res.status(500).json({
+      message: "Failed to fetch booking history",
+      error: err.message
+    });
+  }
+};
+
+// Add status history entry
+export const addStatusHistory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, status_date } = req.body;
+
+    if (!status) {
+      return res.status(400).json({ error: "Status is required" });
+    }
+
+    const historyEntry = await Booking.addBookingStatusHistory(
+      id,
+      status,
+      status_date
+    );
+
+    res.status(201).json({
+      message: "Status history added successfully",
+      history: historyEntry
+    });
+  } catch (err) {
+    res.status(400).json({
+      message: "Failed to add status history",
+      error: err.message
+    });
+  }
+};
+
+// Update status history date
+export const updateStatusHistoryDate = async (req, res) => {
+  try {
+    const { historyId } = req.params;
+    const { status_date } = req.body;
+
+    if (!status_date) {
+      return res.status(400).json({ error: "Status date is required" });
+    }
+
+    const updated = await Booking.updateStatusHistoryDate(
+      historyId,
+      status_date
+    );
+
+    if (!updated) {
+      return res.status(404).json({ error: "History entry not found" });
+    }
+
+    res.json({
+      message: "Status history date updated successfully",
+      history: updated
+    });
+  } catch (err) {
+    res.status(400).json({
+      message: "Failed to update status history date",
+      error: err.message
+    });
+  }
+};

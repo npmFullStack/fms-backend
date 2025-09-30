@@ -1,3 +1,5 @@
+// routes/courierRoutes
+
 import express from "express";
 import { searchBookingPublic, updateBookingStatus } from "../controllers/courierController.js";
 

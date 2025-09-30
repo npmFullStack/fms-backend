@@ -385,3 +385,63 @@ export const deleteBooking = async id => {
     client.release();
   }
 };
+
+// Get booking status history
+export const getBookingStatusHistory = async (bookingId) => {
+  try {
+    const result = await pool.query(
+      `
+      SELECT 
+        id,
+        status,
+        status_date,
+        created_at
+      FROM booking_status_history
+      WHERE booking_id = $1
+      ORDER BY status_date ASC
+      `,
+      [bookingId]
+    );
+    return result.rows;
+  } catch (error) {
+    console.error("Database query error (booking history):", error);
+    throw new Error("Database query failed");
+  }
+};
+
+// Add status history entry
+export const addBookingStatusHistory = async (bookingId, status, statusDate = null) => {
+  try {
+    const result = await pool.query(
+      `
+      INSERT INTO booking_status_history (booking_id, status, status_date)
+      VALUES ($1, $2, COALESCE($3, NOW()))
+      RETURNING *
+      `,
+      [bookingId, status, statusDate]
+    );
+    return result.rows[0];
+  } catch (error) {
+    console.error("Database insert error (booking history):", error);
+    throw new Error("Database insert failed");
+  }
+};
+
+// Update status history date
+export const updateStatusHistoryDate = async (historyId, newDate) => {
+  try {
+    const result = await pool.query(
+      `
+      UPDATE booking_status_history
+      SET status_date = $1
+      WHERE id = $2
+      RETURNING *
+      `,
+      [newDate, historyId]
+    );
+    return result.rows[0];
+  } catch (error) {
+    console.error("Database update error (booking history):", error);
+    throw new Error("Database update failed");
+  }
+};
