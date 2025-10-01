@@ -20,11 +20,15 @@ async function resetDatabase() {
         ];
 
         for (const table of tablesWithTrigger) {
-            await pool.query(`DROP TRIGGER IF EXISTS trigger_update_updated_at_${table} ON ${table} CASCADE;`);
+            await pool.query(
+                `DROP TRIGGER IF EXISTS trigger_update_updated_at_${table} ON ${table} CASCADE;`
+            );
         }
 
         // 2. Drop the update function
-        await pool.query(`DROP FUNCTION IF EXISTS update_updated_at() CASCADE;`);
+        await pool.query(
+            `DROP FUNCTION IF EXISTS update_updated_at() CASCADE;`
+        );
 
         // 3. Drop all tables (CASCADE handles FKs)
         await pool.query(`
@@ -33,6 +37,7 @@ async function resetDatabase() {
         booking_status_history,
         booking_delivery_addresses,
         booking_pickup_addresses,
+        booking_truck_assignments,
         booking_consignee_details,
         booking_shipper_details,
         bookings,
