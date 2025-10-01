@@ -92,24 +92,15 @@ END IF;
 
         // ==================== SHIPPING LINES ====================
         await pool.query(`
-      CREATE TABLE IF NOT EXISTS shipping_lines (
-        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        name VARCHAR(150) UNIQUE NOT NULL,
-        is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      );
-    `);
-
-        await pool.query(`
-      CREATE TABLE IF NOT EXISTS shipping_line_details (
-        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        shipping_line_id UUID NOT NULL REFERENCES shipping_lines(id) ON DELETE CASCADE,
-        logo_url TEXT,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      );
-    `);
+  CREATE TABLE IF NOT EXISTS shipping_lines (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(150) UNIQUE NOT NULL,
+    logo_url TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+`);
 
         await pool.query(`
       CREATE TABLE IF NOT EXISTS ships (
@@ -137,24 +128,15 @@ END IF;
 
         // ==================== TRUCKING ====================
         await pool.query(`
-      CREATE TABLE IF NOT EXISTS trucking_companies (
-        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        name VARCHAR(150) UNIQUE NOT NULL,
-        is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      );
-    `);
-
-        await pool.query(`
-      CREATE TABLE IF NOT EXISTS trucking_company_details (
-        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        trucking_company_id UUID NOT NULL REFERENCES trucking_companies(id) ON DELETE CASCADE,
-        logo_url TEXT,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      );
-    `);
+  CREATE TABLE IF NOT EXISTS trucking_companies (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(150) UNIQUE NOT NULL,
+    logo_url TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+`);
 
         await pool.query(`
       CREATE TABLE IF NOT EXISTS trucks (
@@ -210,10 +192,6 @@ CREATE TABLE IF NOT EXISTS bookings (
     pickup_truck_id UUID REFERENCES trucks(id) ON DELETE SET NULL,
     delivery_trucker_id UUID REFERENCES trucking_companies(id) ON DELETE SET NULL,
     delivery_truck_id UUID REFERENCES trucks(id) ON DELETE SET NULL,
-
-    actual_departure DATE,
-    actual_arrival DATE,
-    actual_delivery DATE,
     
     status booking_status DEFAULT 'PICKUP_SCHEDULED',
     payment_status payment_status DEFAULT 'PENDING',
@@ -264,11 +242,9 @@ CREATE TABLE IF NOT EXISTS bookings (
             "users",
             "user_details",
             "shipping_lines",
-            "shipping_line_details",
             "ships",
             "containers",
             "trucking_companies",
-            "trucking_company_details",
             "trucks",
             "bookings",
             "booking_containers"
