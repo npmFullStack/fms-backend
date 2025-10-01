@@ -152,58 +152,78 @@ END IF;
 
         // ==================== BOOKINGS ====================
         await pool.query(`
-  CREATE SEQUENCE IF NOT EXISTS booking_number_seq START 1;
-  CREATE SEQUENCE IF NOT EXISTS hwb_number_seq START 1;
+CREATE SEQUENCE IF NOT EXISTS booking_number_seq START 1;
+CREATE SEQUENCE IF NOT EXISTS hwb_number_seq START 1;
 
-CREATE TABLE IF NOT EXISTS bookings (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    
-    shipper VARCHAR(150) NOT NULL,
-    first_name VARCHAR(100),
-    last_name VARCHAR(100),
-    phone VARCHAR(20),
-    
-    consignee VARCHAR(150) NOT NULL,
-    consignee_name VARCHAR(100),
-    consignee_phone VARCHAR(20),
-    
-    shipping_line_id UUID NOT NULL REFERENCES shipping_lines(id) ON DELETE CASCADE,
-    ship_id UUID REFERENCES ships(id) ON DELETE SET NULL,
-    quantity INTEGER DEFAULT 1,
-    booking_mode booking_mode NOT NULL,
-    commodity VARCHAR(200) NOT NULL,
-    
-    origin_port VARCHAR(100) NOT NULL,
-    destination_port VARCHAR(100) NOT NULL,
+  CREATE TABLE IF NOT EXISTS bookings (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      shipping_line_id UUID NOT NULL REFERENCES shipping_lines(id) ON DELETE CASCADE,
+      ship_id UUID REFERENCES ships(id) ON DELETE SET NULL,
+      quantity INTEGER DEFAULT 1,
+      booking_mode booking_mode NOT NULL,
+      commodity VARCHAR(200) NOT NULL,
+      origin_port VARCHAR(100) NOT NULL,
+      destination_port VARCHAR(100) NOT NULL,
+      status booking_status DEFAULT 'PICKUP_SCHEDULED',
+      payment_status payment_status DEFAULT 'PENDING',
+      booking_number VARCHAR(50) UNIQUE,
+      hwb_number VARCHAR(50) UNIQUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+`);
 
-    pickup_province VARCHAR(255),
-    pickup_city VARCHAR(255),
-    pickup_barangay VARCHAR(255),
-    pickup_street VARCHAR(255),
-    
-    delivery_province VARCHAR(255),
-    delivery_city VARCHAR(255),
-    delivery_barangay VARCHAR(255),
-    delivery_street VARCHAR(255),
+        // Shipper details
+        await pool.query(`
+  CREATE TABLE IF NOT EXISTS booking_shipper_details (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+      company_name VARCHAR(150) NOT NULL,
+      first_name VARCHAR(100),
+      last_name VARCHAR(100),
+      phone VARCHAR(20)
+  );
+`);
 
+        // Consignee details
+        await pool.query(`
+  CREATE TABLE IF NOT EXISTS booking_consignee_details (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+      company_name VARCHAR(150) NOT NULL,
+      contact_name VARCHAR(100),
+      phone VARCHAR(20)
+  );
+`);
 
-    pickup_trucker_id UUID REFERENCES trucking_companies(id) ON DELETE SET NULL,
-    pickup_truck_id UUID REFERENCES trucks(id) ON DELETE SET NULL,
-    delivery_trucker_id UUID REFERENCES trucking_companies(id) ON DELETE SET NULL,
-    delivery_truck_id UUID REFERENCES trucks(id) ON DELETE SET NULL,
-    
-    status booking_status DEFAULT 'PICKUP_SCHEDULED',
-    payment_status payment_status DEFAULT 'PENDING',
-    
-    booking_number VARCHAR(50) UNIQUE,
-    hwb_number VARCHAR(50) UNIQUE,
-    
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    
-      );
-    `);
+        // Pickup address
+        await pool.query(`
+  CREATE TABLE IF NOT EXISTS booking_pickup_addresses (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+      province VARCHAR(255),
+      city VARCHAR(255),
+      barangay VARCHAR(255),
+      street VARCHAR(255),
+      trucker_id UUID REFERENCES trucking_companies(id) ON DELETE SET NULL,
+      truck_id UUID REFERENCES trucks(id) ON DELETE SET NULL
+  );
+`);
+
+        // Delivery address
+        await pool.query(`
+  CREATE TABLE IF NOT EXISTS booking_delivery_addresses (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+      province VARCHAR(255),
+      city VARCHAR(255),
+      barangay VARCHAR(255),
+      street VARCHAR(255),
+      trucker_id UUID REFERENCES trucking_companies(id) ON DELETE SET NULL,
+      truck_id UUID REFERENCES trucks(id) ON DELETE SET NULL
+  );
+`);
 
         // for multiple containers per booking
         await pool.query(`
