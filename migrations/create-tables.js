@@ -197,6 +197,18 @@ CREATE SEQUENCE IF NOT EXISTS hwb_number_seq START 1;
   );
 `);
 
+        await pool.query(`
+CREATE TABLE IF NOT EXISTS booking_truck_assignments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+    pickup_trucker_id UUID REFERENCES trucking_companies(id) ON DELETE SET NULL,
+    pickup_truck_id UUID REFERENCES trucks(id) ON DELETE SET NULL,
+    delivery_trucker_id UUID REFERENCES trucking_companies(id) ON DELETE SET NULL,
+    delivery_truck_id UUID REFERENCES trucks(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+`);
         // Pickup address
         await pool.query(`
   CREATE TABLE IF NOT EXISTS booking_pickup_addresses (

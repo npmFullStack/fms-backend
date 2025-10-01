@@ -43,13 +43,11 @@ export const createBooking = async bookingData => {
     `INSERT INTO bookings (
       user_id, shipping_line_id, ship_id, quantity, booking_mode,
       commodity, origin_port, destination_port,
-      pickup_trucker_id, pickup_truck_id, delivery_trucker_id, delivery_truck_id,
       booking_number, hwb_number
     )
     VALUES (
       $1,$2,$3,$4,$5,
       $6,$7,$8,
-      $9,$10,$11,$12,
       'BKG-' || LPAD(nextval('booking_number_seq')::text, 4, '0'),
       'HWB-' || LPAD(nextval('hwb_number_seq')::text, 4, '0')
     )
@@ -62,11 +60,7 @@ export const createBooking = async bookingData => {
       booking_mode,
       commodity,
       origin_port,
-      destination_port,
-      pickup_trucker_id,
-      pickup_truck_id,
-      delivery_trucker_id,
-      delivery_truck_id
+      destination_port
     ]
   );
 
@@ -75,7 +69,7 @@ export const createBooking = async bookingData => {
   // Insert shipper details
   await pool.query(
     `INSERT INTO booking_shipper_details 
-    (booking_id, shipper, first_name, last_name, phone)
+    (booking_id, company_name, first_name, last_name, phone)
     VALUES ($1,$2,$3,$4,$5)`,
     [booking.id, shipper, first_name, last_name, phone]
   );
@@ -83,7 +77,7 @@ export const createBooking = async bookingData => {
   // Insert consignee details
   await pool.query(
     `INSERT INTO booking_consignee_details
-    (booking_id, consignee, consignee_name, consignee_phone)
+    (booking_id, company_name, contact_name, phone)
     VALUES ($1,$2,$3,$4)`,
     [booking.id, consignee, consignee_name, consignee_phone]
   );
@@ -105,7 +99,7 @@ export const createBooking = async bookingData => {
   );
 
   // Insert containers
-  if (container_ids && container_ids.length > 0) {
+  if (container_ids.length > 0) {
     for (let i = 0; i < container_ids.length; i++) {
       await pool.query(
         `INSERT INTO booking_containers (booking_id, container_id, sequence_number)
@@ -118,6 +112,14 @@ export const createBooking = async bookingData => {
       );
     }
   }
+
+  // Insert trucking assignment
+  await pool.query(
+    `INSERT INTO booking_truck_assignments
+      (booking_id, pickup_trucker_id, pickup_truck_id, delivery_trucker_id, delivery_truck_id)
+     VALUES ($1,$2,$3,$4,$5)`,
+    [booking.id, pickup_trucker_id, pickup_truck_id, delivery_trucker_id, delivery_truck_id]
+  );
 
   return booking;
 };
@@ -164,26 +166,23 @@ export const updateBooking = async (id, bookingData) => {
       shipping_line_id=$1, ship_id=$2,
       quantity=$3, booking_mode=$4,
       commodity=$5, origin_port=$6, destination_port=$7,
-      pickup_trucker_id=$8, pickup_truck_id=$9,
-      delivery_trucker_id=$10, delivery_truck_id=$11,
-      status=$12, payment_status=$13,
+      status=$8, payment_status=$9,
       updated_at=NOW()
-    WHERE id=$14
+    WHERE id=$10
     RETURNING *`,
     [
       shipping_line_id, ship_id,
       quantity, booking_mode,
       commodity, origin_port, destination_port,
-      pickup_trucker_id, pickup_truck_id,
-      delivery_trucker_id, delivery_truck_id,
-      status, payment_status, id
+      status, payment_status,
+      id
     ]
   );
 
   // Update shipper
   await pool.query(
     `UPDATE booking_shipper_details
-     SET shipper=$1, first_name=$2, last_name=$3, phone=$4
+     SET company_name=$1, first_name=$2, last_name=$3, phone=$4
      WHERE booking_id=$5`,
     [shipper, first_name, last_name, phone, id]
   );
@@ -191,7 +190,7 @@ export const updateBooking = async (id, bookingData) => {
   // Update consignee
   await pool.query(
     `UPDATE booking_consignee_details
-     SET consignee=$1, consignee_name=$2, consignee_phone=$3
+     SET company_name=$1, contact_name=$2, phone=$3
      WHERE booking_id=$4`,
     [consignee, consignee_name, consignee_phone, id]
   );
@@ -213,7 +212,7 @@ export const updateBooking = async (id, bookingData) => {
   );
 
   // Update containers
-  if (container_ids && container_ids.length > 0) {
+  if (container_ids.length > 0) {
     const existingContainers = await pool.query(
       `SELECT container_id FROM booking_containers WHERE booking_id=$1`,
       [id]
@@ -239,10 +238,20 @@ export const updateBooking = async (id, bookingData) => {
     }
   }
 
+  // Update trucking assignment
+  await pool.query(
+    `UPDATE booking_truck_assignments
+     SET pickup_trucker_id=$1, pickup_truck_id=$2,
+         delivery_trucker_id=$3, delivery_truck_id=$4,
+         updated_at=NOW()
+     WHERE booking_id=$5`,
+    [pickup_trucker_id, pickup_truck_id, delivery_trucker_id, delivery_truck_id, id]
+  );
+
   return result.rows[0];
 };
 
-// ================== GET ALL BOOKINGS ==================
+// ================== FETCH BOOKINGS WITH TRUCKING ==================
 export const getAllBookings = async () => {
   const result = await pool.query(`
     SELECT 
@@ -252,12 +261,14 @@ export const getAllBookings = async () => {
       ud.last_name AS created_by_last_name,
       sl.name AS shipping_line_name,
       s.vessel_number AS ship_vessel_number,
-      sh.shipper, sh.first_name AS shipper_first_name, sh.last_name AS shipper_last_name, sh.phone AS shipper_phone,
-      co.consignee, co.consignee_name, co.consignee_phone,
+      sh.company_name AS shipper, sh.first_name AS shipper_first_name, sh.last_name AS shipper_last_name, sh.phone AS shipper_phone,
+      co.company_name AS consignee, co.contact_name AS consignee_name, co.phone AS consignee_phone,
       pa.province AS pickup_province, pa.city AS pickup_city, pa.barangay AS pickup_barangay, pa.street AS pickup_street,
       da.province AS delivery_province, da.city AS delivery_city, da.barangay AS delivery_barangay, da.street AS delivery_street,
-      pt.name AS pickup_trucker_name, ptk.plate_number AS pickup_truck_plate,
-      dt.name AS delivery_trucker_name, dtk.plate_number AS delivery_truck_plate,
+      bta.pickup_trucker_id, pt.name AS pickup_trucker_name,
+      bta.pickup_truck_id, ptk.plate_number AS pickup_truck_plate,
+      bta.delivery_trucker_id, dt.name AS delivery_trucker_name,
+      bta.delivery_truck_id, dtk.plate_number AS delivery_truck_plate,
       COALESCE(
         JSON_AGG(
           CASE WHEN bc.container_id IS NOT NULL THEN
@@ -282,22 +293,23 @@ export const getAllBookings = async () => {
     LEFT JOIN booking_delivery_addresses da ON b.id=da.booking_id
     LEFT JOIN booking_containers bc ON b.id=bc.booking_id
     LEFT JOIN containers c ON bc.container_id=c.id
-    LEFT JOIN trucking_companies pt ON b.pickup_trucker_id=pt.id
-    LEFT JOIN trucks ptk ON b.pickup_truck_id=ptk.id
-    LEFT JOIN trucking_companies dt ON b.delivery_trucker_id=dt.id
-    LEFT JOIN trucks dtk ON b.delivery_truck_id=dtk.id
+    LEFT JOIN booking_truck_assignments bta ON b.id=bta.booking_id
+    LEFT JOIN trucking_companies pt ON bta.pickup_trucker_id=pt.id
+    LEFT JOIN trucks ptk ON bta.pickup_truck_id=ptk.id
+    LEFT JOIN trucking_companies dt ON bta.delivery_trucker_id=dt.id
+    LEFT JOIN trucks dtk ON bta.delivery_truck_id=dtk.id
     GROUP BY b.id,u.email,ud.first_name,ud.last_name,sl.name,s.vessel_number,
-             sh.shipper,sh.first_name,sh.last_name,sh.phone,
-             co.consignee,co.consignee_name,co.consignee_phone,
+             sh.company_name,sh.first_name,sh.last_name,sh.phone,
+             co.company_name,co.contact_name,co.phone,
              pa.province,pa.city,pa.barangay,pa.street,
              da.province,da.city,da.barangay,da.street,
-             pt.name,ptk.plate_number,dt.name,dtk.plate_number
+             bta.pickup_trucker_id,pt.name,bta.pickup_truck_id,ptk.plate_number,
+             bta.delivery_trucker_id,dt.name,bta.delivery_truck_id,dtk.plate_number
     ORDER BY b.created_at DESC
   `);
   return result.rows;
 };
 
-// ================== GET ONE BOOKING ==================
 export const getBookingById = async id => {
   const result = await pool.query(`
     SELECT 
@@ -307,12 +319,14 @@ export const getBookingById = async id => {
       ud.last_name AS created_by_last_name,
       sl.name AS shipping_line_name,
       s.vessel_number AS ship_vessel_number,
-      sh.shipper, sh.first_name AS shipper_first_name, sh.last_name AS shipper_last_name, sh.phone AS shipper_phone,
-      co.consignee, co.consignee_name, co.consignee_phone,
+      sh.company_name AS shipper, sh.first_name AS shipper_first_name, sh.last_name AS shipper_last_name, sh.phone AS shipper_phone,
+      co.company_name AS consignee, co.contact_name AS consignee_name, co.phone AS consignee_phone,
       pa.province AS pickup_province, pa.city AS pickup_city, pa.barangay AS pickup_barangay, pa.street AS pickup_street,
       da.province AS delivery_province, da.city AS delivery_city, da.barangay AS delivery_barangay, da.street AS delivery_street,
-      pt.name AS pickup_trucker_name, ptk.plate_number AS pickup_truck_plate,
-      dt.name AS delivery_trucker_name, dtk.plate_number AS delivery_truck_plate,
+      bta.pickup_trucker_id, pt.name AS pickup_trucker_name,
+      bta.pickup_truck_id, ptk.plate_number AS pickup_truck_plate,
+      bta.delivery_trucker_id, dt.name AS delivery_trucker_name,
+      bta.delivery_truck_id, dtk.plate_number AS delivery_truck_plate,
       COALESCE(
         JSON_AGG(
           CASE WHEN bc.container_id IS NOT NULL THEN
@@ -337,17 +351,19 @@ export const getBookingById = async id => {
     LEFT JOIN booking_delivery_addresses da ON b.id=da.booking_id
     LEFT JOIN booking_containers bc ON b.id=bc.booking_id
     LEFT JOIN containers c ON bc.container_id=c.id
-    LEFT JOIN trucking_companies pt ON b.pickup_trucker_id=pt.id
-    LEFT JOIN trucks ptk ON b.pickup_truck_id=ptk.id
-    LEFT JOIN trucking_companies dt ON b.delivery_trucker_id=dt.id
-    LEFT JOIN trucks dtk ON b.delivery_truck_id=dtk.id
+    LEFT JOIN booking_truck_assignments bta ON b.id=bta.booking_id
+    LEFT JOIN trucking_companies pt ON bta.pickup_trucker_id=pt.id
+    LEFT JOIN trucks ptk ON bta.pickup_truck_id=ptk.id
+    LEFT JOIN trucking_companies dt ON bta.delivery_trucker_id=dt.id
+    LEFT JOIN trucks dtk ON bta.delivery_truck_id=dtk.id
     WHERE b.id=$1
     GROUP BY b.id,u.email,ud.first_name,ud.last_name,sl.name,s.vessel_number,
-             sh.shipper,sh.first_name,sh.last_name,sh.phone,
-             co.consignee,co.consignee_name,co.consignee_phone,
+             sh.company_name,sh.first_name,sh.last_name,sh.phone,
+             co.company_name,co.contact_name,co.phone,
              pa.province,pa.city,pa.barangay,pa.street,
              da.province,da.city,da.barangay,da.street,
-             pt.name,ptk.plate_number,dt.name,dtk.plate_number
+             bta.pickup_trucker_id,pt.name,bta.pickup_truck_id,ptk.plate_number,
+             bta.delivery_trucker_id,dt.name,bta.delivery_truck_id,dtk.plate_number
   `, [id]);
   return result.rows[0];
 };
