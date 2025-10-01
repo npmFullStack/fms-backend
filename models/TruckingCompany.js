@@ -39,3 +39,15 @@ export const deleteTruckingCompanyById = async (id) => {
     [id]
   );
 };
+
+export const getSuccessBookingsByTruckingCompany = async (companyId) => {
+  return await pool.query(
+    `
+    SELECT COUNT(*) AS total_success
+    FROM bookings
+    WHERE (pickup_trucker_id = $1 OR delivery_trucker_id = $1)
+      AND status = 'DELIVERED'
+    `,
+    [companyId]
+  );
+};

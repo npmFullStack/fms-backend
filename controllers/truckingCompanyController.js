@@ -4,7 +4,8 @@ import {
     getTruckingCompanyById,
     createTruckingCompany,
     updateTruckingCompany,
-    deleteTruckingCompanyById
+    deleteTruckingCompanyById,
+    getSuccessBookingsByTruckingCompany
 } from "../models/TruckingCompany.js";
 import { partnerSchema } from "../schemas/partnerSchema.js";
 import {
@@ -41,29 +42,28 @@ export const getTruckingCompany = async (req, res) => {
 };
 
 export const addTruckingCompany = async (req, res) => {
-  try {
-    const id = uuidv4();
+    try {
+        const id = uuidv4();
 
-    // Insert partner first (without logo yet)
-    await createTruckingCompany(id, req.body.name, null);
+        // Insert partner first (without logo yet)
+        await createTruckingCompany(id, req.body.name, null);
 
-    // Respond immediately
-    res.status(201).json({
-      message: "Trucking company created successfully",
-      truckingCompany: { id, name: req.body.name, logoUrl: null }
-    });
+        // Respond immediately
+        res.status(201).json({
+            message: "Trucking company created successfully",
+            truckingCompany: { id, name: req.body.name, logoUrl: null }
+        });
 
-    // If logo exists → upload async and update DB
-    if (req.file) {
-      const result = await uploadToCloudinary(req.file.buffer);
-      await updateTruckingCompany(id, req.body.name, result.secure_url);
+        // If logo exists → upload async and update DB
+        if (req.file) {
+            const result = await uploadToCloudinary(req.file.buffer);
+            await updateTruckingCompany(id, req.body.name, result.secure_url);
+        }
+    } catch (error) {
+        console.error("Error creating trucking company:", error);
+        res.status(500).json({ message: "Server error", error: error.message });
     }
-  } catch (error) {
-    console.error("Error creating trucking company:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
 };
-
 
 export const editTruckingCompany = async (req, res) => {
     let logoUrl = null;
@@ -130,17 +130,37 @@ export const editTruckingCompany = async (req, res) => {
 };
 
 export const deleteTruckingCompany = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const result = await deleteTruckingCompanyById(id);
+    try {
+        const { id } = req.params;
+        const result = await deleteTruckingCompanyById(id);
 
-    if (!result.rowCount) {
-      return res.status(404).json({ message: "Trucking company not found" });
+        if (!result.rowCount) {
+            return res
+                .status(404)
+                .json({ message: "Trucking company not found" });
+        }
+
+        res.json({ message: "Trucking company removed successfully" });
+    } catch (error) {
+        console.error("Error deleting trucking company:", error);
+        res.status(500).json({ message: "Server error" });
     }
+};
 
-    res.json({ message: "Trucking company removed successfully" });
-  } catch (error) {
-    console.error("Error deleting trucking company:", error);
-    res.status(500).json({ message: "Server error" });
-  }
+export const getTruckingCompanySuccessBookings = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await getSuccessBookingsByTruckingCompany(id);
+
+        res.json({
+            truckingCompanyId: id,
+            totalSuccess: parseInt(result.rows[0].total_success, 10)
+        });
+    } catch (error) {
+        console.error(
+            "Error fetching trucking company success bookings:",
+            error
+        );
+        res.status(500).json({ message: "Server error" });
+    }
 };
