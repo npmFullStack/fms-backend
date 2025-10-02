@@ -115,11 +115,18 @@ export const createBooking = async bookingData => {
 
   // Insert trucking assignment
   await pool.query(
-    `INSERT INTO booking_truck_assignments
-      (booking_id, pickup_trucker_id, pickup_truck_id, delivery_trucker_id, delivery_truck_id)
-     VALUES ($1,$2,$3,$4,$5)`,
-    [booking.id, pickup_trucker_id, pickup_truck_id, delivery_trucker_id, delivery_truck_id]
-  );
+  `INSERT INTO booking_truck_assignments
+   (booking_id, pickup_trucker_id, pickup_truck_id, delivery_trucker_id, delivery_truck_id)
+   VALUES ($1,$2,$3,$4,$5)`,
+  [
+    booking.id,
+    pickup_trucker_id || null,
+    pickup_truck_id || null,
+    delivery_trucker_id || null,
+    delivery_truck_id || null
+  ]
+);
+
 
   return booking;
 };
@@ -387,7 +394,7 @@ export const deleteBooking = async id => {
 // ================== STATUS HISTORY ==================
 export const getBookingStatusHistory = async (bookingId) => {
   const result = await pool.query(
-    `SELECT id,status,status_date,created_at
+    `SELECT id, status, status_date, created_at
      FROM booking_status_history
      WHERE booking_id=$1
      ORDER BY status_date ASC`,
@@ -397,22 +404,72 @@ export const getBookingStatusHistory = async (bookingId) => {
 };
 
 export const addBookingStatusHistory = async (bookingId, status, statusDate = null) => {
-  const result = await pool.query(
-    `INSERT INTO booking_status_history (booking_id,status,status_date)
-     VALUES ($1,$2,COALESCE($3,NOW()))
-     RETURNING *`,
-    [bookingId, status, statusDate]
-  );
-  return result.rows[0];
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+    
+    // Insert into history table
+    const historyResult = await client.query(
+      `INSERT INTO booking_status_history (booking_id, status, status_date)
+       VALUES ($1, $2, COALESCE($3, NOW()))
+       RETURNING *`,
+      [bookingId, status, statusDate]
+    );
+    
+    // Update the main booking status
+    await client.query(
+      `UPDATE bookings 
+       SET status = $1, updated_at = NOW()
+       WHERE id = $2`,
+      [status, bookingId]
+    );
+    
+    await client.query('COMMIT');
+    return historyResult.rows[0];
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 };
 
 export const updateStatusHistoryDate = async (historyId, newDate) => {
-  const result = await pool.query(
-    `UPDATE booking_status_history
-     SET status_date=$1
-     WHERE id=$2
-     RETURNING *`,
-    [newDate, historyId]
-  );
-  return result.rows[0];
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+    
+    // Update the history entry
+    const historyResult = await client.query(
+      `UPDATE booking_status_history
+       SET status_date = $1
+       WHERE id = $2
+       RETURNING *`,
+      [newDate, historyId]
+    );
+    
+    if (historyResult.rows.length === 0) {
+      throw new Error('History entry not found');
+    }
+    
+    const updatedHistory = historyResult.rows[0];
+    
+    // Update the main booking status as well
+    await client.query(
+      `UPDATE bookings 
+       SET status = $1, updated_at = NOW()
+       WHERE id = $2`,
+      [updatedHistory.status, updatedHistory.booking_id]
+    );
+    
+    await client.query('COMMIT');
+    return updatedHistory;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 };
