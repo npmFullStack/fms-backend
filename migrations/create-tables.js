@@ -218,9 +218,7 @@ CREATE TABLE IF NOT EXISTS booking_truck_assignments (
       city VARCHAR(255),
       barangay VARCHAR(255),
       street VARCHAR(255),
-      trucker_id UUID REFERENCES trucking_companies(id) ON DELETE SET NULL,
-      truck_id UUID REFERENCES trucks(id) ON DELETE SET NULL
-  );
+        );
 `);
 
         // Delivery address
@@ -232,9 +230,7 @@ CREATE TABLE IF NOT EXISTS booking_truck_assignments (
       city VARCHAR(255),
       barangay VARCHAR(255),
       street VARCHAR(255),
-      trucker_id UUID REFERENCES trucking_companies(id) ON DELETE SET NULL,
-      truck_id UUID REFERENCES trucks(id) ON DELETE SET NULL
-  );
+    );
 `);
 
         // for multiple containers per booking
