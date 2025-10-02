@@ -154,7 +154,7 @@ export const getTruckingCompanySuccessBookings = async (req, res) => {
 
         res.json({
             truckingCompanyId: id,
-            totalSuccess: parseInt(result.rows[0].total_success, 10)
+            totalSuccess: parseInt(result.total_success, 10)
         });
     } catch (error) {
         console.error(

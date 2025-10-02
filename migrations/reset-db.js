@@ -40,6 +40,7 @@ async function resetDatabase() {
         booking_truck_assignments,
         booking_consignee_details,
         booking_shipper_details,
+        booking_details,
         bookings,
         trucks,
         trucking_companies,

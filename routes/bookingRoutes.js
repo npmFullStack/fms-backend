@@ -1,4 +1,4 @@
-// routes/bookingRoutes.js - REPLACE YOUR ENTIRE FILE WITH THIS
+// routes/bookingRoutes.js 
 import express from "express";
 import {
   createBooking,
@@ -20,6 +20,7 @@ router.use(verifyTokenMiddleware);
 router.get("/", getBookings);
 router.get("/:id", getBooking);
 router.post("/", createBooking);
+router.put("/:id", updateBooking);
 router.patch("/:id", updateBooking);
 router.delete("/:id", deleteBooking);
 

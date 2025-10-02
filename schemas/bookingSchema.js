@@ -17,9 +17,7 @@ export const bookingSchema = z.object({
   booking_mode: z.enum([
     "DOOR_TO_DOOR",
     "PIER_TO_PIER",
-    "CY_TO_DOOR",
-    "DOOR_TO_CY",
-    "CY_TO_CY"
+
   ]),
   commodity: z.string().min(2, "Commodity must be at least 2 characters"),
   quantity: z.number().int().positive(),
@@ -41,6 +39,9 @@ export const bookingSchema = z.object({
   pickup_truck_id: z.string().uuid().optional().nullable(),
   delivery_trucker_id: z.string().uuid().optional().nullable(),
   delivery_truck_id: z.string().uuid().optional().nullable(),
+
+payment_status: z.enum(['PENDING', 'PAID',
+'OVERDUE']).default('PENDING').optional(),
 
   status: z.enum([
     "PICKUP_SCHEDULED",
