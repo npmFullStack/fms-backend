@@ -217,7 +217,7 @@ CREATE TABLE IF NOT EXISTS booking_truck_assignments (
       province VARCHAR(255),
       city VARCHAR(255),
       barangay VARCHAR(255),
-      street VARCHAR(255),
+      street VARCHAR(255)
         );
 `);
 
@@ -229,7 +229,7 @@ CREATE TABLE IF NOT EXISTS booking_truck_assignments (
       province VARCHAR(255),
       city VARCHAR(255),
       barangay VARCHAR(255),
-      street VARCHAR(255),
+      street VARCHAR(255)
     );
 `);
 
