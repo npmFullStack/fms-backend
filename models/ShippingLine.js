@@ -35,14 +35,14 @@ export const deleteShippingLineById = async id => {
     return await pool.query(`DELETE FROM shipping_lines WHERE id = $1`, [id]);
 };
 
-export const getSuccessBookingsByShippingLine = async (shippingLineId) => {
-  return await pool.query(
-    `
+export const getSuccessBookingsByShippingLine = async shippingLineId => {
+    return await pool.query(
+        `
     SELECT COUNT(*) AS total_success
     FROM bookings
     WHERE shipping_line_id = $1
       AND status = 'DELIVERED'
     `,
-    [shippingLineId]
-  );
+        [shippingLineId]
+    );
 };
