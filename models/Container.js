@@ -55,19 +55,20 @@ export const getAvailableContainer = async shipping_line_id => {
 
 // Update container
 export const updateContainer = async (id, { size, vanNumber, isReturned }) => {
-    const result = await pool.query(
-        `UPDATE containers 
-         SET size = $1, van_number = $2, is_returned = $3, 
-             updated_at = NOW(),
-             returned_date = CASE 
-                 WHEN $3 = TRUE AND is_returned = FALSE THEN NOW()
-                 ELSE returned_date 
-             END
-         WHERE id = $4 RETURNING *`,
-        [size, vanNumber, isReturned, id]
-    );
-    return result.rows[0];
+  const result = await pool.query(
+    `UPDATE containers  
+     SET 
+       size = COALESCE($1, size),
+       van_number = COALESCE($2, van_number),
+       is_returned = COALESCE($3, is_returned),
+       updated_at = NOW()
+     WHERE id = $4 RETURNING *`,
+    [size ?? null, vanNumber ?? null, isReturned ?? null, id]
+  );
+  return result.rows[0];
 };
+
+
 
 // Delete container
 export const deleteContainer = async id => {
