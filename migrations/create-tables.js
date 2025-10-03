@@ -120,6 +120,7 @@ END IF;
         size container_type NOT NULL,
         van_number VARCHAR(100) NOT NULL,
         is_returned BOOLEAN DEFAULT TRUE,
+        returned_date TIMESTAMPTZ,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         UNIQUE (shipping_line_id, van_number)

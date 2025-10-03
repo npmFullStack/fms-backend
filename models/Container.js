@@ -54,16 +54,17 @@ export const getAvailableContainer = async shipping_line_id => {
 };
 
 // Update container
-export const updateContainer = async (id, { size, vanNumber, isReturned }) => {
+export const updateContainer = async (id, { size, vanNumber, isReturned, returnedDate }) => {
   const result = await pool.query(
     `UPDATE containers  
      SET 
        size = COALESCE($1, size),
        van_number = COALESCE($2, van_number),
        is_returned = COALESCE($3, is_returned),
+       returned_date = COALESCE($4, returned_date),
        updated_at = NOW()
-     WHERE id = $4 RETURNING *`,
-    [size ?? null, vanNumber ?? null, isReturned ?? null, id]
+     WHERE id = $5 RETURNING *`,
+    [size ?? null, vanNumber ?? null, isReturned ?? null, returnedDate ?? null, id]
   );
   return result.rows[0];
 };
