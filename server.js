@@ -1,7 +1,11 @@
 // server.js
+import dotenv from "dotenv";
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
+
+// Load environment variables
+dotenv.config();
+
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import shippingLineRoutes from "./routes/shippingLineRoutes.js";
@@ -12,16 +16,14 @@ import truckRoutes from "./routes/truckRoutes.js";
 import bookingRoutes from "./routes/bookingRoutes.js";
 import courierRoutes from "./routes/courierRoutes.js";
 
-dotenv.config();
-
 const app = express();
 
 // Configure CORS
 app.use(
-    cors({
-        origin: ["http://localhost:3000", "https://fms-azure.vercel.app"],
-        credentials: true
-    })
+  cors({
+    origin: ["http://localhost:3000", "https://fms-azure.vercel.app"],
+    credentials: true
+  })
 );
 
 app.use(express.json({ limit: "10mb" }));
@@ -40,7 +42,7 @@ app.use("/couriers", courierRoutes);
 
 // Simple health check
 app.get("/health", (req, res) => {
-    res.status(200).json({ status: "OK" });
+  res.status(200).json({ status: "OK" });
 });
 
 const PORT = process.env.PORT || 5000;
