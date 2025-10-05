@@ -39,6 +39,9 @@ async function resetDatabase() {
       "idx_notifications_user_id",
       "idx_notifications_is_read",
       "idx_notifications_created_at",
+      "idx_paymongo_booking_id",
+      "idx_paymongo_status",
+      "idx_paymongo_method",
     ];
 
     for (const idx of indexes) {
@@ -64,7 +67,8 @@ async function resetDatabase() {
         ships,
         shipping_lines,
         user_details,
-        users
+        users,
+        paymongo_payments
       CASCADE;
     `);
 
@@ -81,6 +85,7 @@ await pool.query(`DROP VIEW IF EXISTS booking_summary CASCADE;`);
     await pool.query(`DROP TYPE IF EXISTS booking_mode CASCADE;`);
     await pool.query(`DROP TYPE IF EXISTS container_type CASCADE;`);
     await pool.query(`DROP TYPE IF EXISTS user_role CASCADE;`);
+    await pool.query(`DROP TYPE IF EXISTS paymongo_status CASCADE;`);
 
     // Drop extension
     await pool.query(`DROP EXTENSION IF EXISTS "uuid-ossp" CASCADE;`);

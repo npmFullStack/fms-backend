@@ -51,6 +51,15 @@ CREATE TYPE booking_status AS ENUM (
     'DELIVERED'
 );
 END IF;
+
+IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'paymongo_status') THEN
+CREATE TYPE paymongo_status AS ENUM (
+  'PENDING',
+  'SUCCEEDED',
+  'FAILED',
+  'CANCELED'
+);
+END IF;
       END $$;
     `);
 
@@ -270,6 +279,23 @@ CREATE TABLE IF NOT EXISTS booking_truck_assignments (
   );
 `);
 
+        // ==================== PAYMENTS ====================
+await pool.query(`
+CREATE TABLE IF NOT EXISTS paymongo_payments (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  paymongo_payment_intent_id VARCHAR(255) UNIQUE NOT NULL,
+  paymongo_checkout_session_id VARCHAR(255) UNIQUE,
+  amount NUMERIC(12,2) NOT NULL,
+  currency VARCHAR(10) NOT NULL DEFAULT 'PHP',
+  status paymongo_status DEFAULT 'PENDING',
+  payment_method VARCHAR(50) DEFAULT 'GCASH',
+  reference_number VARCHAR(100),
+  payment_date TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+`);
 // ==================== NOTIFICATIONS ======================
 await pool.query(`
 CREATE TABLE IF NOT EXISTS notifications (
@@ -295,6 +321,9 @@ await pool.query(`
   CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
   CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
   CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at);
+CREATE INDEX IF NOT EXISTS idx_paymongo_booking_id ON paymongo_payments(booking_id);
+CREATE INDEX IF NOT EXISTS idx_paymongo_status ON paymongo_payments(status);
+CREATE INDEX IF NOT EXISTS idx_paymongo_method ON paymongo_payments(payment_method);
 `);
 
 // ==================== VIEWS ====================
