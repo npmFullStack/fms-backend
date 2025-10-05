@@ -251,123 +251,25 @@ class Booking {
     return result.rows[0];
   }
 
-  // Get all bookings
-  static async getAll() {
-    const result = await pool.query(`
-      SELECT 
-        b.*,
-        u.email AS created_by_email,
-        ud.first_name AS created_by_first_name,
-        ud.last_name AS created_by_last_name,
-        sl.name AS shipping_line_name,
-        s.vessel_number AS ship_vessel_number,
-        sh.company_name AS shipper, sh.first_name AS shipper_first_name, sh.last_name AS shipper_last_name, sh.phone AS shipper_phone,
-        co.company_name AS consignee, co.contact_name AS consignee_name, co.phone AS consignee_phone,
-        pa.province AS pickup_province, pa.city AS pickup_city, pa.barangay AS pickup_barangay, pa.street AS pickup_street,
-        da.province AS delivery_province, da.city AS delivery_city, da.barangay AS delivery_barangay, da.street AS delivery_street,
-        bta.pickup_trucker_id, pt.name AS pickup_trucker_name,
-        bta.pickup_truck_id, ptk.plate_number AS pickup_truck_plate,
-        bta.delivery_trucker_id, dt.name AS delivery_trucker_name,
-        bta.delivery_truck_id, dtk.plate_number AS delivery_truck_plate,
-        COALESCE(
-          JSON_AGG(
-            CASE WHEN bc.container_id IS NOT NULL THEN
-              JSON_BUILD_OBJECT(
-                'container_id', c.id,
-                'size', c.size,
-                'van_number', c.van_number,
-                'sequence_number', bc.sequence_number
-              )
-            END
-          ) FILTER (WHERE bc.container_id IS NOT NULL),
-          '[]'::json
-        ) AS containers
-      FROM bookings b
-      LEFT JOIN users u ON b.user_id=u.id
-      LEFT JOIN user_details ud ON u.id=ud.user_id
-      LEFT JOIN shipping_lines sl ON b.shipping_line_id=sl.id
-      LEFT JOIN ships s ON b.ship_id=s.id
-      LEFT JOIN booking_shipper_details sh ON b.id=sh.booking_id
-      LEFT JOIN booking_consignee_details co ON b.id=co.booking_id
-      LEFT JOIN booking_pickup_addresses pa ON b.id=pa.booking_id
-      LEFT JOIN booking_delivery_addresses da ON b.id=da.booking_id
-      LEFT JOIN booking_containers bc ON b.id=bc.booking_id
-      LEFT JOIN containers c ON bc.container_id=c.id
-      LEFT JOIN booking_truck_assignments bta ON b.id=bta.booking_id
-      LEFT JOIN trucking_companies pt ON bta.pickup_trucker_id=pt.id
-      LEFT JOIN trucks ptk ON bta.pickup_truck_id=ptk.id
-      LEFT JOIN trucking_companies dt ON bta.delivery_trucker_id=dt.id
-      LEFT JOIN trucks dtk ON bta.delivery_truck_id=dtk.id
-      GROUP BY b.id,u.email,ud.first_name,ud.last_name,sl.name,s.vessel_number,
-               sh.company_name,sh.first_name,sh.last_name,sh.phone,
-               co.company_name,co.contact_name,co.phone,
-               pa.province,pa.city,pa.barangay,pa.street,
-               da.province,da.city,da.barangay,da.street,
-               bta.pickup_trucker_id,pt.name,bta.pickup_truck_id,ptk.plate_number,
-               bta.delivery_trucker_id,dt.name,bta.delivery_truck_id,dtk.plate_number
-      ORDER BY b.created_at DESC
-    `);
-    return result.rows;
-  }
+// Get all bookings (now via the view)
+static async getAll() {
+  const result = await pool.query(`
+    SELECT * FROM booking_summary ORDER BY created_at DESC
+  `);
+  return result.rows;
+}
 
-  // Get booking by ID
-  static async getById(id) {
-    const result = await pool.query(`
-      SELECT 
-        b.*,
-        u.email AS created_by_email,
-        ud.first_name AS created_by_first_name,
-        ud.last_name AS created_by_last_name,
-        sl.name AS shipping_line_name,
-        s.vessel_number AS ship_vessel_number,
-        sh.company_name AS shipper, sh.first_name AS shipper_first_name, sh.last_name AS shipper_last_name, sh.phone AS shipper_phone,
-        co.company_name AS consignee, co.contact_name AS consignee_name, co.phone AS consignee_phone,
-        pa.province AS pickup_province, pa.city AS pickup_city, pa.barangay AS pickup_barangay, pa.street AS pickup_street,
-        da.province AS delivery_province, da.city AS delivery_city, da.barangay AS delivery_barangay, da.street AS delivery_street,
-        bta.pickup_trucker_id, pt.name AS pickup_trucker_name,
-        bta.pickup_truck_id, ptk.plate_number AS pickup_truck_plate,
-        bta.delivery_trucker_id, dt.name AS delivery_trucker_name,
-        bta.delivery_truck_id, dtk.plate_number AS delivery_truck_plate,
-        COALESCE(
-          JSON_AGG(
-            CASE WHEN bc.container_id IS NOT NULL THEN
-              JSON_BUILD_OBJECT(
-                'container_id', c.id,
-                'size', c.size,
-                'van_number', c.van_number,
-                'sequence_number', bc.sequence_number
-              )
-            END
-          ) FILTER (WHERE bc.container_id IS NOT NULL),
-          '[]'::json
-        ) AS containers
-      FROM bookings b
-      LEFT JOIN users u ON b.user_id=u.id
-      LEFT JOIN user_details ud ON u.id=ud.user_id
-      LEFT JOIN shipping_lines sl ON b.shipping_line_id=sl.id
-      LEFT JOIN ships s ON b.ship_id=s.id
-      LEFT JOIN booking_shipper_details sh ON b.id=sh.booking_id
-      LEFT JOIN booking_consignee_details co ON b.id=co.booking_id
-      LEFT JOIN booking_pickup_addresses pa ON b.id=pa.booking_id
-      LEFT JOIN booking_delivery_addresses da ON b.id=da.booking_id
-      LEFT JOIN booking_containers bc ON b.id=bc.booking_id
-      LEFT JOIN containers c ON bc.container_id=c.id
-      LEFT JOIN booking_truck_assignments bta ON b.id=bta.booking_id
-      LEFT JOIN trucking_companies pt ON bta.pickup_trucker_id=pt.id
-      LEFT JOIN trucks ptk ON bta.pickup_truck_id=ptk.id
-      LEFT JOIN trucking_companies dt ON bta.delivery_trucker_id=dt.id
-      LEFT JOIN trucks dtk ON bta.delivery_truck_id=dtk.id
-      WHERE b.id=$1
-      GROUP BY b.id,u.email,ud.first_name,ud.last_name,sl.name,s.vessel_number,
-               sh.company_name,sh.first_name,sh.last_name,sh.phone,
-               co.company_name,co.contact_name,co.phone,
-               pa.province,pa.city,pa.barangay,pa.street,
-               da.province,da.city,da.barangay,da.street,
-               bta.pickup_trucker_id,pt.name,bta.pickup_truck_id,ptk.plate_number,
-               bta.delivery_trucker_id,dt.name,bta.delivery_truck_id,dtk.plate_number
-    `, [id]);
-    return result.rows[0];
-  }
+// Get booking by ID (from main table for detailed info)
+static async getById(id) {
+  const result = await pool.query(
+    `
+    SELECT * FROM booking_summary WHERE id = $1
+    `,
+    [id]
+  );
+  return result.rows[0];
+}
+
 
   // Delete booking
   static async delete(id) {

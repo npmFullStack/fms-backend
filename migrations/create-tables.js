@@ -132,7 +132,7 @@ await pool.query(`
         size container_type NOT NULL,
         van_number VARCHAR(100) NOT NULL,
         is_returned BOOLEAN DEFAULT TRUE,
-        returned_date TIMESTAMPTZ,
+        returned_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         UNIQUE (shipping_line_id, van_number)
@@ -286,17 +286,59 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 `);
 
-        // ==================== INDEXES ====================
-        await pool.query(`
-      CREATE INDEX IF NOT EXISTS idx_containers_is_returned ON containers(is_returned);
-      CREATE INDEX IF NOT EXISTS idx_containers_shipping_line_returned ON containers(shipping_line_id, is_returned);
-      CREATE INDEX IF NOT EXISTS idx_booking_containers_booking_id ON booking_containers(booking_id);
-      CREATE INDEX IF NOT EXISTS idx_booking_containers_container_id ON booking_containers(container_id);
-      CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
-CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
-CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON
-notifications(created_at);
-    `);
+// ==================== INDEXES ====================
+await pool.query(`
+  CREATE INDEX IF NOT EXISTS idx_containers_is_returned ON containers(is_returned);
+  CREATE INDEX IF NOT EXISTS idx_containers_shipping_line_returned ON containers(shipping_line_id, is_returned);
+  CREATE INDEX IF NOT EXISTS idx_booking_containers_booking_id ON booking_containers(booking_id);
+  CREATE INDEX IF NOT EXISTS idx_booking_containers_container_id ON booking_containers(container_id);
+  CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+  CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
+  CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at);
+`);
+
+// ==================== VIEWS ====================
+await pool.query(`
+  CREATE OR REPLACE VIEW booking_summary AS
+  SELECT 
+      b.id,
+      b.booking_number,
+      b.hwb_number,
+      b.status,
+      b.payment_status,
+      b.quantity,
+      b.booking_mode,
+      b.commodity,
+      b.origin_port,
+      b.destination_port,
+      b.created_at,
+      COALESCE(u.email, 'Guest') AS created_by,
+      COALESCE(sd.company_name, 'N/A') AS shipper_name,
+      COALESCE(cd.company_name, 'N/A') AS consignee_name,
+      COALESCE(pa.city || ', ' || pa.province, 'N/A') AS pickup_location,
+      COALESCE(da.city || ', ' || da.province, 'N/A') AS delivery_location,
+      COUNT(c.id) AS container_count,
+      STRING_AGG(c.van_number, ', ') AS container_vans,
+      COALESCE(pt.name, 'N/A') AS pickup_trucker,
+      COALESCE(dt.name, 'N/A') AS delivery_trucker
+  FROM bookings b
+  LEFT JOIN users u ON b.user_id = u.id
+  LEFT JOIN booking_shipper_details sd ON sd.booking_id = b.id
+  LEFT JOIN booking_consignee_details cd ON cd.booking_id = b.id
+  LEFT JOIN booking_pickup_addresses pa ON pa.booking_id = b.id
+  LEFT JOIN booking_delivery_addresses da ON da.booking_id = b.id
+  LEFT JOIN booking_containers bc ON bc.booking_id = b.id
+  LEFT JOIN containers c ON bc.container_id = c.id
+  LEFT JOIN booking_truck_assignments bta ON b.id = bta.booking_id
+  LEFT JOIN trucking_companies pt ON bta.pickup_trucker_id = pt.id
+  LEFT JOIN trucking_companies dt ON bta.delivery_trucker_id = dt.id
+  GROUP BY 
+      b.id, b.booking_number, b.hwb_number, b.status, b.payment_status,
+      b.quantity, b.booking_mode, b.commodity, b.origin_port, b.destination_port,
+      b.created_at, u.email, sd.company_name, cd.company_name,
+      pa.city, pa.province, da.city, da.province, pt.name, dt.name;
+`);
+
 
         // ==================== TRIGGERS ====================
         const tablesForTrigger = [

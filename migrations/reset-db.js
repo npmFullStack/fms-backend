@@ -8,7 +8,7 @@ async function resetDatabase() {
   try {
     console.log("🔄 Resetting database...");
 
-    // 1️⃣ Drop triggers
+    // Drop triggers
     const tablesWithTrigger = [
       "users",
       "user_details",
@@ -27,10 +27,10 @@ async function resetDatabase() {
       );
     }
 
-    // 2️⃣ Drop update function
+    //  Drop update function
     await pool.query(`DROP FUNCTION IF EXISTS update_updated_at() CASCADE;`);
 
-    // 3️⃣ Drop indexes explicitly (to ensure full cleanup)
+    // Drop indexes explicitly (to ensure full cleanup)
     const indexes = [
       "idx_containers_is_returned",
       "idx_containers_shipping_line_returned",
@@ -45,7 +45,7 @@ async function resetDatabase() {
       await pool.query(`DROP INDEX IF EXISTS ${idx} CASCADE;`);
     }
 
-    // 4️⃣ Drop tables (CASCADE handles dependencies)
+    //  Drop tables (CASCADE handles dependencies)
     await pool.query(`
       DROP TABLE IF EXISTS 
         notifications,
@@ -68,18 +68,21 @@ async function resetDatabase() {
       CASCADE;
     `);
 
-    // 5️⃣ Drop sequences
+//  Drop views
+await pool.query(`DROP VIEW IF EXISTS booking_summary CASCADE;`);
+
+    // Drop sequences
     await pool.query(`DROP SEQUENCE IF EXISTS booking_number_seq CASCADE;`);
     await pool.query(`DROP SEQUENCE IF EXISTS hwb_number_seq CASCADE;`);
 
-    // 6️⃣ Drop custom enum types
+    // Drop custom enum types
     await pool.query(`DROP TYPE IF EXISTS payment_status CASCADE;`);
     await pool.query(`DROP TYPE IF EXISTS booking_status CASCADE;`);
     await pool.query(`DROP TYPE IF EXISTS booking_mode CASCADE;`);
     await pool.query(`DROP TYPE IF EXISTS container_type CASCADE;`);
     await pool.query(`DROP TYPE IF EXISTS user_role CASCADE;`);
 
-    // 7️⃣ Drop extension (optional)
+    // Drop extension
     await pool.query(`DROP EXTENSION IF EXISTS "uuid-ossp" CASCADE;`);
 
     console.log("✅ Database reset complete (all tables, triggers, indexes, sequences, enums, and functions dropped)");
