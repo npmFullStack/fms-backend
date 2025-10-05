@@ -270,12 +270,32 @@ CREATE TABLE IF NOT EXISTS booking_truck_assignments (
   );
 `);
 
+// ==================== NOTIFICATIONS ======================
+await pool.query(`
+CREATE TABLE IF NOT EXISTS notifications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    type VARCHAR(50) NOT NULL,
+    entity_type VARCHAR(50),
+    entity_id UUID,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+`);
+
         // ==================== INDEXES ====================
         await pool.query(`
       CREATE INDEX IF NOT EXISTS idx_containers_is_returned ON containers(is_returned);
       CREATE INDEX IF NOT EXISTS idx_containers_shipping_line_returned ON containers(shipping_line_id, is_returned);
       CREATE INDEX IF NOT EXISTS idx_booking_containers_booking_id ON booking_containers(booking_id);
       CREATE INDEX IF NOT EXISTS idx_booking_containers_container_id ON booking_containers(container_id);
+      CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON
+notifications(created_at);
     `);
 
         // ==================== TRIGGERS ====================

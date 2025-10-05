@@ -15,6 +15,8 @@ import containerRoutes from "./routes/containerRoutes.js";
 import truckRoutes from "./routes/truckRoutes.js";
 import bookingRoutes from "./routes/bookingRoutes.js";
 import courierRoutes from "./routes/courierRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
+
 
 const app = express();
 
@@ -39,6 +41,7 @@ app.use("/containers", containerRoutes);
 app.use("/trucks", truckRoutes);
 app.use("/bookings", bookingRoutes);
 app.use("/couriers", courierRoutes);
+app.use("/notifications", notificationRoutes);
 
 // Simple health check
 app.get("/health", (req, res) => {
