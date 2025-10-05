@@ -1,158 +1,132 @@
-// controllers/shippingLineController
 import { v4 as uuidv4 } from "uuid";
-import {
-    getAllShippingLines,
-    getShippingLineById,
-    createShippingLine,
-    updateShippingLine,
-    deleteShippingLineById,
-    getSuccessBookingsByShippingLine
-} from "../models/ShippingLine.js";
+import ShippingLine from "../models/ShippingLine.js";
 import { partnerSchema } from "../schemas/partnerSchema.js";
-import {
-    uploadToCloudinary,
-    deleteFromCloudinary
-} from "../utils/imageUtils.js";
+import { uploadToCloudinary, deleteFromCloudinary } from "../utils/imageUtils.js";
 
+// Get all shipping lines
 export const getShippingLines = async (req, res) => {
-    try {
-        const result = await getAllShippingLines();
-        res.json(result.rows);
-    } catch (error) {
-        console.error("Error getting shipping lines:", error);
-        res.status(500).json({ message: "Server error" });
-    }
+  try {
+    const shippingLines = await ShippingLine.getAll();
+    res.json(shippingLines);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
 };
 
+// Get single shipping line
 export const getShippingLine = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const result = await getShippingLineById(id);
+  try {
+    const { id } = req.params;
+    const shippingLine = await ShippingLine.findById(id);
 
-        if (!result.rows.length) {
-            return res.status(404).json({ message: "Shipping line not found" });
-        }
-
-        res.json(result.rows[0]);
-    } catch (error) {
-        console.error("Error getting shipping line:", error);
-        res.status(500).json({ message: "Server error" });
+    if (!shippingLine) {
+      return res.status(404).json({ message: "Shipping line not found" });
     }
+
+    res.json(shippingLine);
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
 };
 
+// Create new shipping line
 export const addShippingLine = async (req, res) => {
-    try {
-        const id = uuidv4();
+  try {
+    const id = uuidv4();
+    const { name } = req.body;
 
-        // Insert partner first (without logo yet)
-        await createShippingLine(id, req.body.name, null);
+    // Create shipping line without logo first
+    const shippingLine = await ShippingLine.create(id, name, null);
 
-        // Respond immediately to frontend (faster success)
-        res.status(201).json({
-            message: "Shipping line created successfully",
-            shippingLine: { id, name: req.body.name, logoUrl: null }
-        });
+    // Respond immediately
+    res.status(201).json({
+      message: "Shipping line created successfully",
+      shippingLine
+    });
 
-        // If logo exists → upload async and update DB
-        if (req.file) {
-            const result = await uploadToCloudinary(req.file.buffer);
-            await updateShippingLine(id, req.body.name, result.secure_url);
-        }
-    } catch (error) {
-        console.error("Error creating shipping line:", error);
-        res.status(500).json({ message: "Server error", error: error.message });
+    // Upload logo in background if provided
+    if (req.file) {
+      try {
+        const result = await uploadToCloudinary(req.file.buffer);
+        await ShippingLine.update(id, name, result.secure_url);
+      } catch (uploadError) {
+        console.error("Logo upload failed:", uploadError);
+      }
     }
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
 };
 
+// Update shipping line
 export const editShippingLine = async (req, res) => {
-    let logoUrl = null;
-    let publicId = null;
+  try {
+    const { id } = req.params;
+    const { name } = req.body;
 
-    try {
-        const { id } = req.params;
-        const currentShippingLine = await getShippingLineById(id);
-
-        if (!currentShippingLine.rows.length) {
-            return res.status(404).json({ message: "Shipping line not found" });
-        }
-
-        // Handle new image upload
-        if (req.file) {
-            const result = await uploadToCloudinary(req.file.buffer);
-            logoUrl = result.secure_url;
-            publicId = result.public_id;
-        } else {
-            // Keep existing logo if no new file uploaded
-            logoUrl = currentShippingLine.rows[0].logo_url;
-        }
-
-        const shippingLineData = {
-            name: req.body.name || currentShippingLine.rows[0].name,
-            logoUrl: logoUrl
-        };
-
-        // Validate data
-        partnerSchema.parse(shippingLineData);
-
-        await updateShippingLine(
-            id,
-            shippingLineData.name,
-            shippingLineData.logoUrl
-        );
-
-        res.json({
-            message: "Shipping line updated successfully",
-            shippingLine: { id, ...shippingLineData }
-        });
-    } catch (error) {
-        // Clean up uploaded image if error occurs
-        if (publicId) {
-            await deleteFromCloudinary(publicId);
-        }
-
-        console.error("Error updating shipping line:", error);
-
-        if (error.errors) {
-            return res.status(400).json({
-                message: "Validation error",
-                errors: error.errors
-            });
-        }
-
-        res.status(500).json({
-            message: "Server error",
-            error: error.message
-        });
+    // Get current shipping line
+    const currentShippingLine = await ShippingLine.findById(id);
+    if (!currentShippingLine) {
+      return res.status(404).json({ message: "Shipping line not found" });
     }
+
+    let logoUrl = currentShippingLine.logo_url;
+
+    // Handle new logo upload
+    if (req.file) {
+      const result = await uploadToCloudinary(req.file.buffer);
+      logoUrl = result.secure_url;
+    }
+
+    // Validate data
+    const validatedData = partnerSchema.parse({ name, logoUrl });
+
+    // Update shipping line
+    const updatedShippingLine = await ShippingLine.update(
+      id, 
+      validatedData.name, 
+      validatedData.logoUrl
+    );
+
+    res.json({
+      message: "Shipping line updated successfully",
+      shippingLine: updatedShippingLine
+    });
+  } catch (error) {
+    if (error.errors) {
+      return res.status(400).json({ message: error.errors[0].message });
+    }
+    res.status(500).json({ message: "Server error" });
+  }
 };
 
+// Delete shipping line
 export const deleteShippingLine = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const result = await deleteShippingLineById(id);
+  try {
+    const { id } = req.params;
+    const deleted = await ShippingLine.delete(id);
 
-        if (!result.rowCount) {
-            return res.status(404).json({ message: "Shipping line not found" });
-        }
-
-        res.json({ message: "Shipping line removed successfully" });
-    } catch (error) {
-        console.error("Error deleting shipping line:", error);
-        res.status(500).json({ message: "Server error" });
+    if (!deleted) {
+      return res.status(404).json({ message: "Shipping line not found" });
     }
+
+    res.json({ message: "Shipping line deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
 };
 
+// Get success bookings count
 export const getShippingLineSuccessBookings = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const result = await getSuccessBookingsByShippingLine(id);
+  try {
+    const { id } = req.params;
+    const totalSuccess = await ShippingLine.getSuccessBookings(id);
 
-        res.json({
-            shippingLineId: id,
-            totalSuccess: parseInt(result.rows[0].total_success, 10)
-        });
-    } catch (error) {
-        console.error("Error fetching success bookings:", error);
-        res.status(500).json({ message: "Server error" });
-    }
+    res.json({
+      shippingLineId: id,
+      totalSuccess
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
 };

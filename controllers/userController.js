@@ -1,242 +1,162 @@
-// controllers/userController.js
-import {
-    uploadToCloudinary,
-    deleteFromCloudinary,
-    getPublicId
-} from "../utils/imageUtils.js";
+import { uploadToCloudinary, deleteFromCloudinary, getPublicId } from "../utils/imageUtils.js";
 import { v4 as uuidv4 } from "uuid";
-import {
-    getAllUsers,
-    findUserById,
-    findUserByEmail,
-    createUser,
-    updateUserById,
-    restrictUserById,
-    unrestrictUserById,
-    updateUserProfilePicture
-} from "../models/User.js";
+import User from "../models/User.js";
 import { addUserSchema, updateUserSchema } from "../schemas/userSchema.js";
-import { hashPassword, comparePassword } from "../utils/passwordUtils.js";
+import { hashPassword } from "../utils/passwordUtils.js";
 
+// Create new user
 export const addUser = async (req, res) => {
-  let publicId = null;
-
   try {
     const userId = uuidv4();
-
-    // Parse form data (no profile picture yet)
+    
+    // Get user data from request
     const userData = {
       firstName: req.body.firstName,
       lastName: req.body.lastName,
-      email:
-        req.body.email ||
-        `${req.body.firstName.toLowerCase()}.${req.body.lastName.toLowerCase()}@example.com`,
+      email: req.body.email || `${req.body.firstName}.${req.body.lastName}@example.com`,
       password: req.body.password || "password",
       role: req.body.role,
-      phone: req.body.phone || null,
-      profile_picture: null
+      phone: req.body.phone || null
     };
 
-    // Validate
+    // Validate data
     addUserSchema.parse(userData);
 
-    // Check for duplicate email
-    const existing = await findUserByEmail(userData.email);
-    if (existing.rows.length > 0) {
+    // Check if email already exists
+    const existing = await User.findByEmail(userData.email);
+    if (existing) {
       return res.status(400).json({ message: "Email already exists" });
     }
 
     // Hash password
     const hashedPassword = await hashPassword(userData.password);
 
-    // Create user in DB first (no profile picture yet)
-    await createUser(
-      userId,
-      userData.firstName,
-      userData.lastName,
-      userData.email,
-      hashedPassword,
-      userData.role,
-      userData.phone,
-      null
-    );
+    // Create user without profile picture first
+    await User.create(userId, userData.firstName, userData.lastName, userData.email, hashedPassword, userData.role, userData.phone, null);
 
-    // Respond immediately ✅
-    res.json({
-      message: "User created successfully",
-      user: { id: userId, ...userData }
-    });
-
-    // ---- Handle profile picture upload in background ----
+    // If there's a profile picture, upload it and update user
     if (req.file) {
       try {
         const result = await uploadToCloudinary(req.file.buffer);
-        publicId = result.public_id;
-
-        // Update DB with profile picture once uploaded
-        await updateUserProfilePicture(userId, result.secure_url);
+        await User.updateProfilePicture(userId, result.secure_url);
       } catch (uploadErr) {
-        console.error("Cloudinary upload failed:", uploadErr);
+        console.error("Failed to upload profile picture:", uploadErr);
       }
     }
+
+    res.json({ message: "User created successfully", userId });
   } catch (error) {
-    console.error("Error in addUser:", error);
-
-    if (publicId) {
-      await deleteFromCloudinary(publicId);
-    }
-
     if (error.errors) {
-      return res.status(400).json({
-        message: "Validation error",
-        errors: error.errors
-      });
+      return res.status(400).json({ message: error.errors[0].message });
     }
-
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-};
-
-
-
-export const getUserById = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const user = await findUserById(id);
-
-        if (!user.rows.length) {
-            return res.status(404).json({ message: "User not found" });
-        }
-
-        res.json(user.rows[0]);
-    } catch (error) {
-        console.error("Error getting user:", error);
-        res.status(500).json({ message: "Server error" });
-    }
-};
-
-export const getUsers = async (req, res) => {
-    try {
-        const result = await getAllUsers();
-        res.json({ rows: result.rows });
-    } catch (err) {
-        console.error("Error getting users:", err);
-        res.status(500).json({ message: "Server error" });
-    }
-};
-
-export const updateUser = async (req, res) => {
-    let profilePictureUrl = null;
-    let publicId = null;
-
-    try {
-        const { id } = req.params;
-        const currentUser = await findUserById(id);
-
-        if (!currentUser.rows.length) {
-            return res.status(404).json({ message: "User not found" });
-        }
-
-        const currentPublicId = getPublicId(currentUser.rows[0].profile_picture);
-
-        // Handle new image upload
-        if (req.file) {
-            const result = await uploadToCloudinary(req.file.buffer);
-            profilePictureUrl = result.secure_url;
-            publicId = result.public_id;
-
-            // Delete old image if it exists
-            if (currentPublicId) {
-                await deleteFromCloudinary(currentPublicId);
-            }
-        } else {
-            // Keep existing image
-            profilePictureUrl = currentUser.rows[0].profile_picture;
-        }
-
-        // Prepare update data
-        const updateData = {
-            firstName: req.body.first_name || currentUser.rows[0].first_name,
-            lastName: req.body.last_name || currentUser.rows[0].last_name,
-            email: req.body.email || currentUser.rows[0].email,
-            role: req.body.role || currentUser.rows[0].role,
-            phone: req.body.phone || currentUser.rows[0].phone || null,
-            profile_picture: profilePictureUrl
-        };
-
-        // Validate with updateUserSchema
-        updateUserSchema.parse(updateData);
-
-        // Update user in database
-        await updateUserById(
-            id,
-            updateData.firstName,
-            updateData.lastName,
-            updateData.email,
-            updateData.role,
-            updateData.profile_picture,
-            updateData.phone // Added phone to match your schema
-        );
-
-        res.json({ 
-            message: "User updated successfully",
-            user: {
-                id,
-                ...updateData
-            }
-        });
-
-    } catch (error) {
-        // Clean up uploaded image if there's an error
-        if (publicId) {
-            await deleteFromCloudinary(publicId);
-        }
-
-        console.error("Error updating user:", error);
-        
-        if (error.errors) {
-            return res.status(400).json({
-                message: "Validation error",
-                errors: error.errors
-            });
-        }
-
-        res.status(500).json({ 
-            message: "Server error",
-            error: error.message 
-        });
-    }
-};
-
-
-export const restrictUser = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const result = await restrictUserById(id);
-
-    if (!result.rows.length) {
-      return res.status(404).json({ message: "User not found" });
-    }
-
-    res.json({ message: "User restricted successfully", user: result.rows[0] });
-  } catch (error) {
-    console.error("Error restricting user:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
 
-export const unrestrictUser = async (req, res) => {
+// Get single user by ID
+export const getUserById = async (req, res) => {
   try {
     const { id } = req.params;
-    const result = await unrestrictUserById(id);
+    const user = await User.findById(id);
 
-    if (!result.rows.length) {
+    if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    res.json({ message: "User unrestricted successfully", user: result.rows[0] });
+    res.json(user);
   } catch (error) {
-    console.error("Error unrestricting user:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Get all users
+export const getUsers = async (req, res) => {
+  try {
+    const users = await User.getAll();
+    res.json({ users });
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Update user information
+export const updateUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if user exists
+    const currentUser = await User.findById(id);
+    if (!currentUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    let profilePictureUrl = currentUser.profile_picture;
+
+    // Handle new profile picture upload
+    if (req.file) {
+      const result = await uploadToCloudinary(req.file.buffer);
+      profilePictureUrl = result.secure_url;
+
+      // Delete old profile picture if exists
+      const currentPublicId = getPublicId(currentUser.profile_picture);
+      if (currentPublicId) {
+        await deleteFromCloudinary(currentPublicId);
+      }
+    }
+
+    // Prepare update data object (only include provided fields)
+    const updateData = {
+      firstName: req.body.first_name,
+      lastName: req.body.last_name,
+      email: req.body.email,
+      role: req.body.role,
+      phone: req.body.phone,
+      profilePicture: profilePictureUrl
+    };
+
+    // Validate data
+    updateUserSchema.parse(updateData);
+
+    // Update user in database using object
+    await User.update(id, updateData);
+
+    res.json({ message: "User updated successfully" });
+  } catch (error) {
+    if (error.errors) {
+      return res.status(400).json({ message: error.errors[0].message });
+    }
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Restrict user (deactivate)
+export const restrictUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.restrict(id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({ message: "User restricted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Unrestrict user (reactivate)
+export const unrestrictUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.unrestrict(id);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.json({ message: "User unrestricted successfully" });
+  } catch (error) {
     res.status(500).json({ message: "Server error" });
   }
 };

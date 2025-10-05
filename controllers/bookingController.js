@@ -1,26 +1,22 @@
-// controllers/bookingController.js
 import {
     bookingSchema,
     bookingUpdateSchema
 } from "../schemas/bookingSchema.js";
-import * as Booking from "../models/Booking.js";
+import Booking from "../models/Booking.js";
 
 // Create a new booking
 export const createBooking = async (req, res) => {
     try {
         const validated = bookingSchema.parse(req.body);
 
-        // Validate that container_ids length matches quantity
         if (validated.container_ids.length !== validated.quantity) {
             return res.status(400).json({
-                message:
-                    "Number of containers must match the specified quantity",
+                message: "Number of containers must match the specified quantity",
                 error: `Expected ${validated.quantity} containers, but got ${validated.container_ids.length}`
             });
         }
 
-        // Attach logged-in user ID as creator
-        const booking = await Booking.createBooking({
+        const booking = await Booking.create({
             ...validated,
             user_id: req.user?.id || null
         });
@@ -40,7 +36,7 @@ export const createBooking = async (req, res) => {
 // Get all bookings
 export const getBookings = async (_req, res) => {
     try {
-        const bookings = await Booking.getAllBookings();
+        const bookings = await Booking.getAll();
         res.json({ bookings });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -50,7 +46,7 @@ export const getBookings = async (_req, res) => {
 // Get booking by ID
 export const getBooking = async (req, res) => {
     try {
-        const booking = await Booking.getBookingById(req.params.id);
+        const booking = await Booking.getById(req.params.id);
         if (!booking) {
             return res.status(404).json({ error: "Booking not found" });
         }
@@ -71,13 +67,12 @@ export const updateBooking = async (req, res) => {
             validated.container_ids.length !== validated.quantity
         ) {
             return res.status(400).json({
-                message:
-                    "Number of containers must match the specified quantity",
+                message: "Number of containers must match the specified quantity",
                 error: `Expected ${validated.quantity} containers, but got ${validated.container_ids.length}`
             });
         }
 
-        const booking = await Booking.updateBooking(req.params.id, validated);
+        const booking = await Booking.update(req.params.id, validated);
         if (!booking) {
             return res.status(404).json({ error: "Booking not found" });
         }
@@ -96,7 +91,7 @@ export const updateBooking = async (req, res) => {
 // Delete booking
 export const deleteBooking = async (req, res) => {
     try {
-        await Booking.deleteBooking(req.params.id);
+        await Booking.delete(req.params.id);
         res.json({ message: "Booking deleted successfully" });
     } catch (err) {
         res.status(500).json({
@@ -106,11 +101,11 @@ export const deleteBooking = async (req, res) => {
     }
 };
 
-// Public search booking by booking_number or hwb_number (no auth required)
+// Public search booking by booking_number or hwb_number
 export const searchBookingPublic = async (req, res) => {
     try {
         const { query } = req.params;
-        const booking = await Booking.findByNumberOrHwb(query); // we'll add this in the model
+        const booking = await Booking.findByNumberOrHwb(query);
 
         if (!booking) {
             return res.status(404).json({ error: "Booking not found" });
@@ -129,7 +124,7 @@ export const searchBookingPublic = async (req, res) => {
 export const getBookingHistory = async (req, res) => {
   try {
     const { id } = req.params;
-    const history = await Booking.getBookingStatusHistory(id);
+    const history = await Booking.getStatusHistory(id);
     res.json({ history });
   } catch (err) {
     res.status(500).json({
@@ -149,11 +144,7 @@ export const addStatusHistory = async (req, res) => {
       return res.status(400).json({ error: "Status is required" });
     }
 
-    const historyEntry = await Booking.addBookingStatusHistory(
-      id,
-      status,
-      status_date
-    );
+    const historyEntry = await Booking.addStatusHistory(id, status, status_date);
 
     res.status(201).json({
       message: "Status history added successfully",
@@ -177,10 +168,7 @@ export const updateStatusHistoryDate = async (req, res) => {
       return res.status(400).json({ error: "Status date is required" });
     }
 
-    const updated = await Booking.updateStatusHistoryDate(
-      historyId,
-      status_date
-    );
+    const updated = await Booking.updateStatusHistoryDate(historyId, status_date);
 
     if (!updated) {
       return res.status(404).json({ error: "History entry not found" });
