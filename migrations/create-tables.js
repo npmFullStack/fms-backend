@@ -312,15 +312,15 @@ await pool.query(`
       b.origin_port,
       b.destination_port,
       b.created_at,
-      COALESCE(u.email, 'Guest') AS created_by,
-      COALESCE(sd.company_name, 'N/A') AS shipper_name,
-      COALESCE(cd.company_name, 'N/A') AS consignee_name,
-      COALESCE(pa.city || ', ' || pa.province, 'N/A') AS pickup_location,
-      COALESCE(da.city || ', ' || da.province, 'N/A') AS delivery_location,
+      u.email AS created_by,
+      sd.company_name AS shipper_name,
+      cd.company_name AS consignee_name,
+      (pa.city || ', ' || pa.province) AS pickup_location,
+      (da.city || ', ' || da.province) AS delivery_location,
       COUNT(c.id) AS container_count,
       STRING_AGG(c.van_number, ', ') AS container_vans,
-      COALESCE(pt.name, 'N/A') AS pickup_trucker,
-      COALESCE(dt.name, 'N/A') AS delivery_trucker
+      pt.name AS pickup_trucker,
+      dt.name AS delivery_trucker
   FROM bookings b
   LEFT JOIN users u ON b.user_id = u.id
   LEFT JOIN booking_shipper_details sd ON sd.booking_id = b.id
@@ -338,6 +338,7 @@ await pool.query(`
       b.created_at, u.email, sd.company_name, cd.company_name,
       pa.city, pa.province, da.city, da.province, pt.name, dt.name;
 `);
+
 
 
         // ==================== TRIGGERS ====================
