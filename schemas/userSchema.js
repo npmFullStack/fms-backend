@@ -1,4 +1,4 @@
-// schemas/userSchema.js
+// backend/schemas/userSchema.js
 
 import { z } from "zod";
 

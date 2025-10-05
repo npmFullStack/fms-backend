@@ -326,7 +326,7 @@ notifications(created_at);
         await pool.query(
             `WITH new_user AS (
         INSERT INTO users (email, password, role)
-        VALUES ('admin@gmail.com', $1, 'general_manager')
+        VALUES ('gm@gmail.com', $1, 'general_manager')
         ON CONFLICT (email) DO NOTHING
         RETURNING id
       )

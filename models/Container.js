@@ -55,27 +55,46 @@ class Container {
     return result.rows;
   }
 
-  // Update container information
-  static async update(id, containerData) {
-    const result = await pool.query(
-      `UPDATE containers  
-       SET 
-         size = COALESCE($1, size),
-         van_number = COALESCE($2, van_number),
-         is_returned = COALESCE($3, is_returned),
-         returned_date = COALESCE($4, returned_date),
-         updated_at = NOW()
-       WHERE id = $5 RETURNING *`,
-      [
-        containerData.size ?? null,
-        containerData.vanNumber ?? null,
-        containerData.isReturned ?? null,
-        containerData.returnedDate ?? null,
-        id
-      ]
-    );
-    return result.rows[0];
+// Update container information
+static async update(id, containerData) {
+  const updates = [];
+  const values = [];
+  let paramCount = 1;
+
+  if (containerData.size !== undefined && containerData.size !== null) {
+    updates.push(`size = $${paramCount++}`);
+    values.push(containerData.size);
   }
+  
+  if (containerData.vanNumber !== undefined && containerData.vanNumber !== null) {
+    updates.push(`van_number = $${paramCount++}`);
+    values.push(containerData.vanNumber);
+  }
+  
+  if (containerData.isReturned !== undefined && containerData.isReturned !== null) {
+    updates.push(`is_returned = $${paramCount++}`);
+    values.push(containerData.isReturned);
+  }
+  
+  if (containerData.returnedDate !== undefined && containerData.returnedDate !== null) {
+    updates.push(`returned_date = $${paramCount++}`);
+    values.push(containerData.returnedDate);
+  }
+
+  if (updates.length === 0) {
+    return await Container.findById(id);
+  }
+
+  updates.push(`updated_at = NOW()`);
+  values.push(id);
+
+  const result = await pool.query(
+    `UPDATE containers SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`,
+    values
+  );
+  
+  return result.rows[0];
+}
 
   // Delete container
   static async delete(id) {
