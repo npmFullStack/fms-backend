@@ -326,10 +326,11 @@ CREATE INDEX IF NOT EXISTS idx_paymongo_status ON paymongo_payments(status);
 CREATE INDEX IF NOT EXISTS idx_paymongo_method ON paymongo_payments(payment_method);
 `);
 
+
 // ==================== VIEWS ====================
 await pool.query(`
   DROP VIEW IF EXISTS booking_summary;
-  
+
   CREATE OR REPLACE VIEW booking_summary AS
   SELECT
     b.id,
@@ -346,23 +347,23 @@ await pool.query(`
     b.ship_id,
     b.created_at,
     b.updated_at,
-    
+
     -- User info
     u.email AS created_by,
     ud.first_name,
     ud.last_name,
-    
+
     -- Shipper details
     sd.company_name AS shipper,
     sd.first_name AS shipper_first_name,
     sd.last_name AS shipper_last_name,
     sd.phone AS shipper_phone,
-    
+
     -- Consignee details
     cd.company_name AS consignee,
     cd.contact_name AS consignee_name,
     cd.phone AS consignee_phone,
-    
+
     -- Addresses
     (pa.city || ', ' || pa.province) AS pickup_location,
     (da.city || ', ' || da.province) AS delivery_location,
@@ -374,15 +375,15 @@ await pool.query(`
     da.city AS delivery_city,
     da.barangay AS delivery_barangay,
     da.street AS delivery_street,
-    
+
     -- Shipping line info
     sl.name AS shipping_line_name,
     sl.logo_url AS shipping_line_logo,
-    
+
     -- Ship info
     s.vessel_number AS ship_vessel_number,
     s.ship_name,
-    
+
     -- Trucking info
     pt.name AS pickup_trucker,
     pt.id AS pickup_trucker_id,
@@ -392,24 +393,39 @@ await pool.query(`
     dt.id AS delivery_trucker_id,
     dtrk.name AS delivery_truck_name,
     dtrk.id AS delivery_truck_id,
-    
+
     -- Container aggregated info
     COUNT(DISTINCT c.id) AS container_count,
-    STRING_AGG(DISTINCT c.van_number, ', ' ORDER BY c.van_number) AS container_vans,
-    
-    -- Aggregate containers as JSON array with full details
+
+    -- ✅ STRING_AGG with DISTINCT + ORDER BY via subquery
+    (
+      SELECT STRING_AGG(v.van_number, ', ' ORDER BY v.van_number)
+      FROM (
+        SELECT DISTINCT c2.van_number
+        FROM booking_containers bc2
+        JOIN containers c2 ON bc2.container_id = c2.id
+        WHERE bc2.booking_id = b.id
+      ) v
+    ) AS container_vans,
+
+    -- ✅ JSON_AGG with DISTINCT + ORDER BY via subquery
     COALESCE(
-      JSON_AGG(
-        DISTINCT JSONB_BUILD_OBJECT(
-          'id', c.id,
-          'van_number', c.van_number,
-          'size', c.size,
-          'is_returned', c.is_returned,
-          'returned_date', c.returned_date,
-          'shipping_line_id', c.shipping_line_id
-        )
-        ORDER BY c.van_number
-      ) FILTER (WHERE c.id IS NOT NULL),
+      (
+        SELECT JSON_AGG(container_data ORDER BY container_data->>'van_number')
+        FROM (
+          SELECT DISTINCT JSONB_BUILD_OBJECT(
+            'id', c2.id,
+            'van_number', c2.van_number,
+            'size', c2.size,
+            'is_returned', c2.is_returned,
+            'returned_date', c2.returned_date,
+            'shipping_line_id', c2.shipping_line_id
+          ) AS container_data
+          FROM booking_containers bc2
+          JOIN containers c2 ON bc2.container_id = c2.id
+          WHERE bc2.booking_id = b.id
+        ) t
+      ),
       '[]'::json
     ) AS containers
 
@@ -444,6 +460,8 @@ await pool.query(`
     pt.name, pt.id, ptrk.name, ptrk.id,
     dt.name, dt.id, dtrk.name, dtrk.id;
 `);
+
+
 
 
 
