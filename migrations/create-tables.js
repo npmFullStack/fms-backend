@@ -328,44 +328,121 @@ CREATE INDEX IF NOT EXISTS idx_paymongo_method ON paymongo_payments(payment_meth
 
 // ==================== VIEWS ====================
 await pool.query(`
+  DROP VIEW IF EXISTS booking_summary;
+  
   CREATE OR REPLACE VIEW booking_summary AS
-  SELECT 
-      b.id,
-      b.booking_number,
-      b.hwb_number,
-      b.status,
-      b.payment_status,
-      b.quantity,
-      b.booking_mode,
-      b.commodity,
-      b.origin_port,
-      b.destination_port,
-      b.created_at,
-      u.email AS created_by,
-      sd.company_name AS shipper_name,
-      cd.company_name AS consignee_name,
-      (pa.city || ', ' || pa.province) AS pickup_location,
-      (da.city || ', ' || da.province) AS delivery_location,
-      COUNT(c.id) AS container_count,
-      STRING_AGG(c.van_number, ', ') AS container_vans,
-      pt.name AS pickup_trucker,
-      dt.name AS delivery_trucker
+  SELECT
+    b.id,
+    b.booking_number,
+    b.hwb_number,
+    b.status,
+    b.payment_status,
+    b.quantity,
+    b.booking_mode,
+    b.commodity,
+    b.origin_port,
+    b.destination_port,
+    b.shipping_line_id,
+    b.ship_id,
+    b.created_at,
+    b.updated_at,
+    
+    -- User info
+    u.email AS created_by,
+    ud.first_name,
+    ud.last_name,
+    
+    -- Shipper details
+    sd.company_name AS shipper,
+    sd.first_name AS shipper_first_name,
+    sd.last_name AS shipper_last_name,
+    sd.phone AS shipper_phone,
+    
+    -- Consignee details
+    cd.company_name AS consignee,
+    cd.contact_name AS consignee_name,
+    cd.phone AS consignee_phone,
+    
+    -- Addresses
+    (pa.city || ', ' || pa.province) AS pickup_location,
+    (da.city || ', ' || da.province) AS delivery_location,
+    pa.province AS pickup_province,
+    pa.city AS pickup_city,
+    pa.barangay AS pickup_barangay,
+    pa.street AS pickup_street,
+    da.province AS delivery_province,
+    da.city AS delivery_city,
+    da.barangay AS delivery_barangay,
+    da.street AS delivery_street,
+    
+    -- Shipping line info
+    sl.name AS shipping_line_name,
+    sl.logo_url AS shipping_line_logo,
+    
+    -- Ship info
+    s.vessel_number AS ship_vessel_number,
+    s.ship_name,
+    
+    -- Trucking info
+    pt.name AS pickup_trucker,
+    pt.id AS pickup_trucker_id,
+    ptrk.name AS pickup_truck_name,
+    ptrk.id AS pickup_truck_id,
+    dt.name AS delivery_trucker,
+    dt.id AS delivery_trucker_id,
+    dtrk.name AS delivery_truck_name,
+    dtrk.id AS delivery_truck_id,
+    
+    -- Container aggregated info
+    COUNT(DISTINCT c.id) AS container_count,
+    STRING_AGG(DISTINCT c.van_number, ', ' ORDER BY c.van_number) AS container_vans,
+    
+    -- Aggregate containers as JSON array with full details
+    COALESCE(
+      JSON_AGG(
+        DISTINCT JSONB_BUILD_OBJECT(
+          'id', c.id,
+          'van_number', c.van_number,
+          'size', c.size,
+          'is_returned', c.is_returned,
+          'returned_date', c.returned_date,
+          'shipping_line_id', c.shipping_line_id
+        )
+        ORDER BY c.van_number
+      ) FILTER (WHERE c.id IS NOT NULL),
+      '[]'::json
+    ) AS containers
+
   FROM bookings b
   LEFT JOIN users u ON b.user_id = u.id
+  LEFT JOIN user_details ud ON u.id = ud.user_id
   LEFT JOIN booking_shipper_details sd ON sd.booking_id = b.id
   LEFT JOIN booking_consignee_details cd ON cd.booking_id = b.id
   LEFT JOIN booking_pickup_addresses pa ON pa.booking_id = b.id
   LEFT JOIN booking_delivery_addresses da ON da.booking_id = b.id
   LEFT JOIN booking_containers bc ON bc.booking_id = b.id
   LEFT JOIN containers c ON bc.container_id = c.id
+  LEFT JOIN shipping_lines sl ON b.shipping_line_id = sl.id
+  LEFT JOIN ships s ON b.ship_id = s.id
   LEFT JOIN booking_truck_assignments bta ON b.id = bta.booking_id
   LEFT JOIN trucking_companies pt ON bta.pickup_trucker_id = pt.id
+  LEFT JOIN trucks ptrk ON bta.pickup_truck_id = ptrk.id
   LEFT JOIN trucking_companies dt ON bta.delivery_trucker_id = dt.id
-  GROUP BY 
-      b.id, b.booking_number, b.hwb_number, b.status, b.payment_status,
-      b.quantity, b.booking_mode, b.commodity, b.origin_port, b.destination_port,
-      b.created_at, u.email, sd.company_name, cd.company_name,
-      pa.city, pa.province, da.city, da.province, pt.name, dt.name;
+  LEFT JOIN trucks dtrk ON bta.delivery_truck_id = dtrk.id
+
+  GROUP BY
+    b.id, b.booking_number, b.hwb_number, b.status, b.payment_status,
+    b.quantity, b.booking_mode, b.commodity, b.origin_port, b.destination_port,
+    b.shipping_line_id, b.ship_id, b.created_at, b.updated_at,
+    u.email, ud.first_name, ud.last_name,
+    sd.company_name, sd.first_name, sd.last_name, sd.phone,
+    cd.company_name, cd.contact_name, cd.phone,
+    pa.city, pa.province, pa.barangay, pa.street,
+    da.city, da.province, da.barangay, da.street,
+    sl.name, sl.logo_url,
+    s.vessel_number, s.ship_name,
+    pt.name, pt.id, ptrk.name, ptrk.id,
+    dt.name, dt.id, dtrk.name, dtrk.id;
 `);
 
 

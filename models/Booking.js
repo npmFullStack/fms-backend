@@ -1,3 +1,5 @@
+// models/Booking
+
 import { pool } from "../db/index.js";
 
 class Booking {
