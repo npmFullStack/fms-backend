@@ -1,3 +1,5 @@
+// models/Notification
+// models/Notification.js
 import { pool } from "../db/index.js";
 
 class Notification {
@@ -16,10 +18,37 @@ class Notification {
       VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING *
     `;
-
     const values = [user_id, title, message, type, entity_type, entity_id];
     const result = await pool.query(query, values);
     return result.rows[0];
+  }
+
+  // ✅ Add this bulk insert method
+  static async createBulk(notifications) {
+    if (notifications.length === 0) return [];
+
+    const values = [];
+    const placeholders = notifications.map((n, i) => {
+      const idx = i * 6;
+      values.push(
+        n.user_id,
+        n.title,
+        n.message,
+        n.type,
+        n.entity_type || null,
+        n.entity_id || null
+      );
+      return `($${idx + 1}, $${idx + 2}, $${idx + 3}, $${idx + 4}, $${idx + 5}, $${idx + 6})`;
+    });
+
+    const query = `
+      INSERT INTO notifications (user_id, title, message, type, entity_type, entity_id)
+      VALUES ${placeholders.join(", ")}
+      RETURNING *
+    `;
+
+    const result = await pool.query(query, values);
+    return result.rows;
   }
 
   static async findByUserId(userId, limit = 50) {

@@ -3,34 +3,46 @@ import {
     bookingUpdateSchema
 } from "../schemas/bookingSchema.js";
 import Booking from "../models/Booking.js";
+import { notifyMultipleRoles, getUserFullName } from
+"../utils/notificationService.js";
 
 // Create a new booking
 export const createBooking = async (req, res) => {
-    try {
-        const validated = bookingSchema.parse(req.body);
+  try {
+    const validated = bookingSchema.parse(req.body);
 
-        if (validated.container_ids.length !== validated.quantity) {
-            return res.status(400).json({
-                message: "Number of containers must match the specified quantity",
-                error: `Expected ${validated.quantity} containers, but got ${validated.container_ids.length}`
-            });
-        }
-
-        const booking = await Booking.create({
-            ...validated,
-            user_id: req.user?.id || null
-        });
-
-        res.status(201).json({
-            message: "Booking created successfully",
-            booking
-        });
-    } catch (err) {
-        res.status(400).json({
-            message: "Failed to create booking",
-            error: err.message
-        });
+    if (validated.container_ids.length !== validated.quantity) {
+      return res.status(400).json({
+        message: "Number of containers must match the specified quantity",
+        error: `Expected ${validated.quantity} containers, but got ${validated.container_ids.length}`,
+      });
     }
+
+    const booking = await Booking.create({
+      ...validated,
+      user_id: req.user?.id || null,
+    });
+
+    const fullName = await getUserFullName(req.user?.id);
+
+    await notifyMultipleRoles(["marketing_coordinator", "general_manager"], {
+      title: "New Booking Created",
+      message: `${fullName} created a new booking #${booking.booking_number} with ${validated.quantity} container(s).`,
+      type: "booking",
+      entity_type: "booking",
+      entity_id: booking.id,
+    });
+
+    res.status(201).json({
+      message: "Booking created successfully",
+      booking,
+    });
+  } catch (err) {
+    res.status(400).json({
+      message: "Failed to create booking",
+      error: err.message,
+    });
+  }
 };
 
 // Get all bookings
@@ -146,14 +158,24 @@ export const addStatusHistory = async (req, res) => {
 
     const historyEntry = await Booking.addStatusHistory(id, status, status_date);
 
+    const fullName = await getUserFullName(req.user?.id);
+
+    await notifyMultipleRoles(["marketing_coordinator", "general_manager"], {
+      title: "Booking Status Updated",
+      message: `${fullName} added a new status "${status}" to booking #${historyEntry.booking_number}.`,
+      type: "booking_status",
+      entity_type: "booking",
+      entity_id: id,
+    });
+
     res.status(201).json({
       message: "Status history added successfully",
-      history: historyEntry
+      history: historyEntry,
     });
   } catch (err) {
     res.status(400).json({
       message: "Failed to add status history",
-      error: err.message
+      error: err.message,
     });
   }
 };
@@ -174,14 +196,24 @@ export const updateStatusHistoryDate = async (req, res) => {
       return res.status(404).json({ error: "History entry not found" });
     }
 
+    const fullName = await getUserFullName(req.user?.id);
+
+    await notifyMultipleRoles(["marketing_coordinator", "general_manager"], {
+      title: "Booking Status Date Updated",
+      message: `${fullName} updated the status date for "${updated.status}" on booking #${updated.booking_number}.`,
+      type: "booking_status",
+      entity_type: "booking",
+      entity_id: updated.booking_id,
+    });
+
     res.json({
       message: "Status history date updated successfully",
-      history: updated
+      history: updated,
     });
   } catch (err) {
     res.status(400).json({
       message: "Failed to update status history date",
-      error: err.message
+      error: err.message,
     });
   }
 };

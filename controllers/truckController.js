@@ -1,13 +1,24 @@
 import Truck from "../models/Truck.js";
 import { truckSchema } from "../schemas/truckSchema.js";
+import { notifyMultipleRoles, getUserFullName } from "../utils/notificationService.js";
 
-// Create new truck
 export const createTruck = async (req, res) => {
   try {
     const validated = truckSchema.parse(req.body);
     const truck = await Truck.create(validated);
+    const fullName = await getUserFullName(req.user?.id);
+    
+    await notifyMultipleRoles(["marketing_coordinator", "general_manager"], {
+      title: "New Truck Added",
+      message: `${fullName} added a new truck "${truck.name}".`,
+      type: "truck",
+      entity_type: "truck",
+      entity_id: truck.id,
+    });
+
     res.status(201).json(truck);
   } catch (error) {
+    console.error("❌ createTruck error:", error);
     res.status(400).json({ error: error.message });
   }
 };
@@ -49,7 +60,18 @@ export const updateTruck = async (req, res) => {
   try {
     const { id } = req.params;
     const validated = truckSchema.partial().parse(req.body);
-    await Truck.update(id, validated);
+    const updatedTruck = await Truck.update(id, validated);
+
+    const fullName = await getUserFullName(req.user?.id);
+
+    await notifyMultipleRoles(["marketing_coordinator", "general_manager"], {
+      title: "Truck Updated",
+      message: `${fullName} updated the truck "${updatedTruck.name}".`,
+      type: "truck",
+      entity_type: "truck",
+      entity_id: updatedTruck.id,
+    });
+
     res.json({ message: "Truck updated successfully" });
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -60,7 +82,24 @@ export const updateTruck = async (req, res) => {
 export const deleteTruck = async (req, res) => {
   try {
     const { id } = req.params;
+    const truck = await Truck.findById(id);
+
+    if (!truck) {
+      return res.status(404).json({ error: "Truck not found" });
+    }
+
     await Truck.delete(id);
+
+    const fullName = await getUserFullName(req.user?.id);
+
+    await notifyMultipleRoles(["marketing_coordinator", "general_manager"], {
+      title: "Truck Removed",
+      message: `${fullName} removed the truck "${truck.name}".`,
+      type: "truck",
+      entity_type: "truck",
+      entity_id: id,
+    });
+
     res.json({ message: "Truck deleted successfully" });
   } catch (error) {
     res.status(500).json({ error: error.message });
