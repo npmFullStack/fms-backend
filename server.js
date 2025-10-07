@@ -1,4 +1,4 @@
-// server.js
+// server.js (updated)
 import dotenv from "dotenv";
 import express from "express";
 import cors from "cors";
@@ -18,6 +18,7 @@ import courierRoutes from "./routes/courierRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import webhookRoutes from "./routes/webhookRoutes.js";
+import apRoutes from "./routes/apRoutes.js"; // Add this line
 
 const app = express();
 
@@ -47,7 +48,8 @@ app.use("/trucks", truckRoutes);
 app.use("/bookings", bookingRoutes);
 app.use("/couriers", courierRoutes);
 app.use("/notifications", notificationRoutes);
-app.use("/api/payments", paymentRoutes);
+app.use("/payments", paymentRoutes);
+app.use("/ap", apRoutes);
 
 //  Health check
 app.get("/health", (req, res) => {

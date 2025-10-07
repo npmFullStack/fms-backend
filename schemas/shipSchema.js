@@ -1,3 +1,5 @@
+// backend/schemas/shipSchema
+
 import { z } from "zod";
 
 export const shipSchema = z.object({

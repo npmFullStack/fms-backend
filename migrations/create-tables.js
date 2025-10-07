@@ -41,7 +41,7 @@ async function createTables() {
 
 IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'booking_status') THEN
 CREATE TYPE booking_status AS ENUM (
-    'PICKUP_SCHEDULED',
+    'UP_SCHEDULED',
     'LOADED_TO_TRUCK',
     'ARRIVED_ORIGIN_PORT',
     'LOADED_TO_SHIP',
@@ -312,8 +312,79 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 `);
 
+// ================== ACCOUNTS_PAYABLE ====================
+await pool.query(`
+    CREATE TABLE IF NOT EXISTS accounts_payable (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ap_freight (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      ap_id UUID NOT NULL REFERENCES accounts_payable(id) ON DELETE CASCADE,
+      amount NUMERIC(12,2) DEFAULT 0,
+      check_date DATE,
+      voucher VARCHAR(100),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ap_trucking (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      ap_id UUID NOT NULL REFERENCES accounts_payable(id) ON DELETE CASCADE,
+      type VARCHAR(20) CHECK (type IN ('ORIGIN','DESTINATION')) NOT NULL,
+      amount NUMERIC(12,2) DEFAULT 0,
+      check_date DATE,
+      voucher VARCHAR(100),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ap_port_charges (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      ap_id UUID NOT NULL REFERENCES accounts_payable(id) ON DELETE CASCADE,
+      charge_type VARCHAR(30) CHECK (charge_type IN (
+        'CRAINAGE', 'ARRASTRE_ORIGIN', 'ARRASTRE_DEST',
+        'WHARFAGE_ORIGIN', 'WHARFAGE_DEST',
+        'LABOR_ORIGIN', 'LABOR_DEST'
+      )) NOT NULL,
+      payee VARCHAR(255),
+      amount NUMERIC(12,2) DEFAULT 0,
+      check_date DATE,
+      voucher VARCHAR(100),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ap_misc_charges (
+      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+      ap_id UUID NOT NULL REFERENCES accounts_payable(id) ON DELETE CASCADE,
+      charge_type VARCHAR(30) CHECK (charge_type IN (
+        'REBATES', 'STORAGE', 'FACILITATION', 'DENR'
+      )) NOT NULL,
+      payee VARCHAR(255),
+      amount NUMERIC(12,2) DEFAULT 0,
+      check_date DATE,
+      voucher VARCHAR(100),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+  
+  
 // ==================== INDEXES ====================
 await pool.query(`
+  -- Existing
   CREATE INDEX IF NOT EXISTS idx_containers_is_returned ON containers(is_returned);
   CREATE INDEX IF NOT EXISTS idx_containers_shipping_line_returned ON containers(shipping_line_id, is_returned);
   CREATE INDEX IF NOT EXISTS idx_booking_containers_booking_id ON booking_containers(booking_id);
@@ -321,10 +392,24 @@ await pool.query(`
   CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
   CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
   CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at);
-CREATE INDEX IF NOT EXISTS idx_paymongo_booking_id ON paymongo_payments(booking_id);
-CREATE INDEX IF NOT EXISTS idx_paymongo_status ON paymongo_payments(status);
-CREATE INDEX IF NOT EXISTS idx_paymongo_method ON paymongo_payments(payment_method);
+  CREATE INDEX IF NOT EXISTS idx_paymongo_booking_id ON paymongo_payments(booking_id);
+  CREATE INDEX IF NOT EXISTS idx_paymongo_status ON paymongo_payments(status);
+  CREATE INDEX IF NOT EXISTS idx_paymongo_method ON paymongo_payments(payment_method);
+
+  -- 🆕 AP-related indexes
+  CREATE INDEX IF NOT EXISTS idx_ap_booking_id ON accounts_payable(booking_id);
+
+  CREATE INDEX IF NOT EXISTS idx_ap_freight_ap_id ON ap_freight(ap_id);
+  CREATE INDEX IF NOT EXISTS idx_ap_trucking_ap_id ON ap_trucking(ap_id);
+  CREATE INDEX IF NOT EXISTS idx_ap_trucking_type ON ap_trucking(type);
+
+  CREATE INDEX IF NOT EXISTS idx_ap_port_charges_ap_id ON ap_port_charges(ap_id);
+  CREATE INDEX IF NOT EXISTS idx_ap_port_charges_type ON ap_port_charges(charge_type);
+
+  CREATE INDEX IF NOT EXISTS idx_ap_misc_charges_ap_id ON ap_misc_charges(ap_id);
+  CREATE INDEX IF NOT EXISTS idx_ap_misc_charges_type ON ap_misc_charges(charge_type);
 `);
+
 
 
 // ==================== VIEWS ====================
@@ -461,32 +546,118 @@ await pool.query(`
     dt.name, dt.id, dtrk.name, dtrk.id;
 `);
 
+await pool.query(`
+  DROP VIEW IF EXISTS ap_summary;
+
+  CREATE OR REPLACE VIEW ap_summary AS
+  SELECT
+    ap.id AS ap_id,
+    b.id AS booking_id,
+    b.booking_number,
+    b.hwb_number,
+    b.origin_port,
+    b.destination_port,
+    b.commodity,
+    b.booking_mode,
+    b.quantity,
+    sl.name AS freight_payee,
+
+    -- Freight
+    af.amount AS freight_amount,
+    af.check_date AS freight_check_date,
+    af.voucher AS freight_voucher,
+
+    -- Trucking Origin
+    ptt.name AS trucking_origin_payee,
+    ato.amount AS trucking_origin_amount,
+    ato.check_date AS trucking_origin_check_date,
+    ato.voucher AS trucking_origin_voucher,
+
+    -- Trucking Destination
+    dtt.name AS trucking_dest_payee,
+    atd.amount AS trucking_dest_amount,
+    atd.check_date AS trucking_dest_check_date,
+    atd.voucher AS trucking_dest_voucher,
+
+    -- Port Charges Aggregated
+    (
+      SELECT JSON_AGG(
+        JSON_BUILD_OBJECT(
+          'charge_type', charge_type,
+          'payee', payee,
+          'amount', amount,
+          'check_date', check_date,
+          'voucher', voucher
+        )
+      )
+      FROM ap_port_charges pc
+      WHERE pc.ap_id = ap.id
+    ) AS port_charges,
+
+    -- Misc Charges Aggregated
+    (
+      SELECT JSON_AGG(
+        JSON_BUILD_OBJECT(
+          'charge_type', charge_type,
+          'payee', payee,
+          'amount', amount,
+          'check_date', check_date,
+          'voucher', voucher
+        )
+      )
+      FROM ap_misc_charges mc
+      WHERE mc.ap_id = ap.id
+    ) AS misc_charges,
+
+    ap.created_at,
+    ap.updated_at
+
+  FROM accounts_payable ap
+  JOIN bookings b ON ap.booking_id = b.id
+  LEFT JOIN shipping_lines sl ON b.shipping_line_id = sl.id
+  LEFT JOIN ap_freight af ON af.ap_id = ap.id
+  LEFT JOIN ap_trucking ato ON ato.ap_id = ap.id AND ato.type = 'ORIGIN'
+  LEFT JOIN ap_trucking atd ON atd.ap_id = ap.id AND atd.type = 'DESTINATION'
+  LEFT JOIN booking_truck_assignments bta ON b.id = bta.booking_id
+  LEFT JOIN trucking_companies ptt ON bta.pickup_trucker_id = ptt.id
+  LEFT JOIN trucking_companies dtt ON bta.delivery_trucker_id = dtt.id
+
+  ORDER BY ap.created_at DESC;
+`);
 
 
 
 
-        // ==================== TRIGGERS ====================
-        const tablesForTrigger = [
-            "users",
-            "user_details",
-            "shipping_lines",
-            "ships",
-            "containers",
-            "trucking_companies",
-            "trucks",
-            "bookings",
-            "booking_containers"
-        ];
 
-        for (const t of tablesForTrigger) {
-            await pool.query(`
-        DROP TRIGGER IF EXISTS trigger_update_updated_at_${t} ON ${t};
-        CREATE TRIGGER trigger_update_updated_at_${t}
-        BEFORE UPDATE ON ${t}
-        FOR EACH ROW
-        EXECUTE FUNCTION update_updated_at();
-      `);
-        }
+
+// ==================== TRIGGERS ====================
+const tablesForTrigger = [
+  "users",
+  "user_details",
+  "shipping_lines",
+  "ships",
+  "containers",
+  "trucking_companies",
+  "trucks",
+  "bookings",
+  "booking_containers",
+  "accounts_payable",
+  "ap_freight",
+  "ap_trucking",
+  "ap_port_charges",
+  "ap_misc_charges"
+];
+
+for (const t of tablesForTrigger) {
+  await pool.query(`
+    DROP TRIGGER IF EXISTS trigger_update_updated_at_${t} ON ${t};
+    CREATE TRIGGER trigger_update_updated_at_${t}
+    BEFORE UPDATE ON ${t}
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at();
+  `);
+}
+
 
         // ==================== ADMIN SEED ====================
         const hashedPassword = await bcrypt.hash("admin123", 10);
