@@ -41,7 +41,7 @@ async function createTables() {
 
 IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'booking_status') THEN
 CREATE TYPE booking_status AS ENUM (
-    'UP_SCHEDULED',
+    'PICKUP_SCHEDULED',
     'LOADED_TO_TRUCK',
     'ARRIVED_ORIGIN_PORT',
     'LOADED_TO_SHIP',

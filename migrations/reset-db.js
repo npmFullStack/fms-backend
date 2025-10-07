@@ -19,6 +19,11 @@ async function resetDatabase() {
       "trucks",
       "bookings",
       "booking_containers",
+      "accounts_payable",
+      "ap_freight",
+      "ap_trucking",
+      "ap_port_charges",
+      "ap_misc_charges"
     ];
 
     for (const table of tablesWithTrigger) {
@@ -27,10 +32,14 @@ async function resetDatabase() {
       );
     }
 
-    //  Drop update function
+    // Drop update function
     await pool.query(`DROP FUNCTION IF EXISTS update_updated_at() CASCADE;`);
 
-    // Drop indexes explicitly (to ensure full cleanup)
+    // Drop views
+    await pool.query(`DROP VIEW IF EXISTS booking_summary CASCADE;`);
+    await pool.query(`DROP VIEW IF EXISTS ap_summary CASCADE;`);
+
+    // Drop indexes
     const indexes = [
       "idx_containers_is_returned",
       "idx_containers_shipping_line_returned",
@@ -42,17 +51,30 @@ async function resetDatabase() {
       "idx_paymongo_booking_id",
       "idx_paymongo_status",
       "idx_paymongo_method",
+      "idx_ap_booking_id",
+      "idx_ap_freight_ap_id",
+      "idx_ap_trucking_ap_id",
+      "idx_ap_trucking_type",
+      "idx_ap_port_charges_ap_id",
+      "idx_ap_port_charges_type",
+      "idx_ap_misc_charges_ap_id",
+      "idx_ap_misc_charges_type"
     ];
 
     for (const idx of indexes) {
       await pool.query(`DROP INDEX IF EXISTS ${idx} CASCADE;`);
     }
 
-    //  Drop tables (CASCADE handles dependencies)
+    // Drop tables (CASCADE handles dependencies)
     await pool.query(`
       DROP TABLE IF EXISTS 
+        ap_misc_charges,
+        ap_port_charges,
+        ap_trucking,
+        ap_freight,
+        accounts_payable,
         notifications,
-        password_resets,
+        paymongo_payments,
         booking_status_history,
         booking_delivery_addresses,
         booking_pickup_addresses,
@@ -66,26 +88,23 @@ async function resetDatabase() {
         containers,
         ships,
         shipping_lines,
+        password_resets,
         user_details,
-        users,
-        paymongo_payments
+        users
       CASCADE;
     `);
-
-//  Drop views
-await pool.query(`DROP VIEW IF EXISTS booking_summary CASCADE;`);
 
     // Drop sequences
     await pool.query(`DROP SEQUENCE IF EXISTS booking_number_seq CASCADE;`);
     await pool.query(`DROP SEQUENCE IF EXISTS hwb_number_seq CASCADE;`);
 
     // Drop custom enum types
-    await pool.query(`DROP TYPE IF EXISTS payment_status CASCADE;`);
+    await pool.query(`DROP TYPE IF EXISTS paymongo_status CASCADE;`);
     await pool.query(`DROP TYPE IF EXISTS booking_status CASCADE;`);
+    await pool.query(`DROP TYPE IF EXISTS payment_status CASCADE;`);
     await pool.query(`DROP TYPE IF EXISTS booking_mode CASCADE;`);
     await pool.query(`DROP TYPE IF EXISTS container_type CASCADE;`);
     await pool.query(`DROP TYPE IF EXISTS user_role CASCADE;`);
-    await pool.query(`DROP TYPE IF EXISTS paymongo_status CASCADE;`);
 
     // Drop extension
     await pool.query(`DROP EXTENSION IF EXISTS "uuid-ossp" CASCADE;`);
