@@ -1,4 +1,4 @@
-// backend/schemas/accountsPayableSchema.js
+// backend/schemas/apSchema.js
 import { z } from "zod";
 
 export const createAPSchema = z.object({
