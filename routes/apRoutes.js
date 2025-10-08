@@ -1,44 +1,17 @@
 // routes/apRoutes.js
 import express from "express";
-import {
-    getAllAP,
-    getAPById,
-    getAPByBookingId,
-    getAPByBookingNumber,
-    createAP,
-    addFreight,
-    updateFreight,
-    addTrucking,
-    updateTrucking,
-    addPortCharge,
-    updatePortCharge,
-    addMiscCharge,
-    updateMiscCharge
-} from "../controllers/apController.js";
 import { verifyTokenMiddleware } from "../middleware/authMiddlewares.js";
+import { getAPRecords, upsertAPRecord } from "../controllers/apController.js";
 
 const router = express.Router();
 
-// Apply authentication to all routes
+// 🔐 Apply authentication to all /ap routes
 router.use(verifyTokenMiddleware);
 
-// GET routes
-router.get("/", getAllAP);
-router.get("/:id", getAPById);
-router.get("/booking/:bookingId", getAPByBookingId);
-router.get("/booking-number/:bookingNumber", getAPByBookingNumber);
+// GET /ap → fetch all
+router.get("/", getAPRecords);
 
-// POST routes
-router.post("/", createAP);
-router.post("/:apId/freight", addFreight);
-router.post("/:apId/trucking", addTrucking);
-router.post("/:apId/port-charges", addPortCharge);
-router.post("/:apId/misc-charges", addMiscCharge);
-
-// PUT routes
-router.put("/freight/:freightId", updateFreight);
-router.put("/trucking/:truckingId", updateTrucking);
-router.put("/port-charges/:portChargeId", updatePortCharge);
-router.put("/misc-charges/:miscChargeId", updateMiscCharge);
+// PUT /ap/:apId → insert or update
+router.put("/:apId", upsertAPRecord);
 
 export default router;
