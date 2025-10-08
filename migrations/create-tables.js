@@ -547,10 +547,10 @@ await pool.query(`
 `);
 
 await pool.query(`
-  DROP VIEW IF EXISTS ap_summary;
+DROP VIEW IF EXISTS ap_summary CASCADE;
 
-  CREATE OR REPLACE VIEW ap_summary AS
-  SELECT
+CREATE OR REPLACE VIEW ap_summary AS
+SELECT
     ap.id AS ap_id,
     b.id AS booking_id,
     b.booking_number,
@@ -560,69 +560,78 @@ await pool.query(`
     b.commodity,
     b.booking_mode,
     b.quantity,
+    b.shipping_line_id,
+    
+    -- Freight payee comes from shipping line
     sl.name AS freight_payee,
-
-    -- Freight
-    af.amount AS freight_amount,
+    COALESCE(af.amount, 0) AS freight_amount,
     af.check_date AS freight_check_date,
     af.voucher AS freight_voucher,
-
-    -- Trucking Origin
-    ptt.name AS trucking_origin_payee,
-    ato.amount AS trucking_origin_amount,
+    
+    -- Trucking Origin payee comes from pickup trucker
+    pickup_tc.name AS trucking_origin_payee,
+    COALESCE(ato.amount, 0) AS trucking_origin_amount,
     ato.check_date AS trucking_origin_check_date,
     ato.voucher AS trucking_origin_voucher,
-
-    -- Trucking Destination
-    dtt.name AS trucking_dest_payee,
-    atd.amount AS trucking_dest_amount,
+    
+    -- Trucking Destination payee comes from delivery trucker
+    delivery_tc.name AS trucking_dest_payee,
+    COALESCE(atd.amount, 0) AS trucking_dest_amount,
     atd.check_date AS trucking_dest_check_date,
     atd.voucher AS trucking_dest_voucher,
-
+    
     -- Port Charges Aggregated
-    (
-      SELECT JSON_AGG(
-        JSON_BUILD_OBJECT(
-          'charge_type', charge_type,
-          'payee', payee,
-          'amount', amount,
-          'check_date', check_date,
-          'voucher', voucher
-        )
-      )
-      FROM ap_port_charges pc
-      WHERE pc.ap_id = ap.id
+    COALESCE(
+        (
+            SELECT JSON_AGG(
+                JSON_BUILD_OBJECT(
+                    'charge_type', charge_type,
+                    'payee', payee,
+                    'amount', amount,
+                    'check_date', check_date,
+                    'voucher', voucher
+                )
+            )
+            FROM ap_port_charges pc
+            WHERE pc.ap_id = ap.id
+        ),
+        '[]'::json
     ) AS port_charges,
-
+    
     -- Misc Charges Aggregated
-    (
-      SELECT JSON_AGG(
-        JSON_BUILD_OBJECT(
-          'charge_type', charge_type,
-          'payee', payee,
-          'amount', amount,
-          'check_date', check_date,
-          'voucher', voucher
-        )
-      )
-      FROM ap_misc_charges mc
-      WHERE mc.ap_id = ap.id
+    COALESCE(
+        (
+            SELECT JSON_AGG(
+                JSON_BUILD_OBJECT(
+                    'charge_type', charge_type,
+                    'payee', payee,
+                    'amount', amount,
+                    'check_date', check_date,
+                    'voucher', voucher
+                )
+            )
+            FROM ap_misc_charges mc
+            WHERE mc.ap_id = ap.id
+        ),
+        '[]'::json
     ) AS misc_charges,
-
+    
+    -- Include these for debugging
+    bta.pickup_trucker_id,
+    bta.delivery_trucker_id,
+    
     ap.created_at,
     ap.updated_at
-
-  FROM accounts_payable ap
-  JOIN bookings b ON ap.booking_id = b.id
-  LEFT JOIN shipping_lines sl ON b.shipping_line_id = sl.id
-  LEFT JOIN ap_freight af ON af.ap_id = ap.id
-  LEFT JOIN ap_trucking ato ON ato.ap_id = ap.id AND ato.type = 'ORIGIN'
-  LEFT JOIN ap_trucking atd ON atd.ap_id = ap.id AND atd.type = 'DESTINATION'
-  LEFT JOIN booking_truck_assignments bta ON b.id = bta.booking_id
-  LEFT JOIN trucking_companies ptt ON bta.pickup_trucker_id = ptt.id
-  LEFT JOIN trucking_companies dtt ON bta.delivery_trucker_id = dtt.id
-
-  ORDER BY ap.created_at DESC;
+FROM accounts_payable ap
+INNER JOIN bookings b ON ap.booking_id = b.id
+LEFT JOIN shipping_lines sl ON b.shipping_line_id = sl.id
+LEFT JOIN ap_freight af ON af.ap_id = ap.id
+LEFT JOIN ap_trucking ato ON ato.ap_id = ap.id AND ato.type = 'ORIGIN'
+LEFT JOIN ap_trucking atd ON atd.ap_id = ap.id AND atd.type = 'DESTINATION'
+LEFT JOIN booking_truck_assignments bta ON b.id = bta.booking_id
+LEFT JOIN trucking_companies pickup_tc ON bta.pickup_trucker_id = pickup_tc.id
+LEFT JOIN trucking_companies delivery_tc ON bta.delivery_trucker_id = delivery_tc.id
+ORDER BY ap.created_at DESC;
 `);
 
 
