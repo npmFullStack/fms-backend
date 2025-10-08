@@ -1,4 +1,4 @@
-// schemas/accountsPayableSchema.js
+// backend/schemas/accountsPayableSchema.js
 import { z } from "zod";
 
 export const createAPSchema = z.object({
@@ -54,7 +54,7 @@ export const miscChargeSchema = z.object({
 });
 
 export const updateFreightSchema = freightSchema;
-export const updateTruckingSchema = freightSchema; // Same as freight schema for updates
+export const updateTruckingSchema = freightSchema;
 export const updatePortChargeSchema = portChargeSchema.omit({ chargeType: true });
 export const updateMiscChargeSchema = miscChargeSchema.omit({ chargeType: true
 });
