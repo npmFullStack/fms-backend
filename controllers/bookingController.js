@@ -3,8 +3,8 @@ import {
     bookingUpdateSchema
 } from "../schemas/bookingSchema.js";
 import Booking from "../models/Booking.js";
-import { notifyMultipleRoles, getUserFullName } from
-"../utils/notificationService.js";
+import AP from "../models/AP.js"; // Import the AP model
+import { notifyMultipleRoles, getUserFullName } from "../utils/notificationService.js";
 
 // Create a new booking
 export const createBooking = async (req, res) => {
@@ -22,6 +22,9 @@ export const createBooking = async (req, res) => {
       ...validated,
       user_id: req.user?.id || null,
     });
+
+    // Automatically create AP record for this booking
+    await AP.createForBooking(booking.id);
 
     const fullName = await getUserFullName(req.user?.id);
 
