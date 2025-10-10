@@ -1,3 +1,5 @@
+// controllers/bookingController
+
 import {
     bookingSchema,
     bookingUpdateSchema
@@ -23,7 +25,6 @@ export const createBooking = async (req, res) => {
       user_id: req.user?.id || null,
     });
 
-    // Automatically create AP record for this booking
     await AP.createForBooking(booking.id);
 
     const fullName = await getUserFullName(req.user?.id);

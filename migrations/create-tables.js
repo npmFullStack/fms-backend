@@ -314,73 +314,76 @@ CREATE TABLE IF NOT EXISTS notifications (
 
 // ================== ACCOUNTS_PAYABLE ====================
 await pool.query(`
-    CREATE TABLE IF NOT EXISTS accounts_payable (
-      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-      booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
-  
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS ap_freight (
-      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-      ap_id UUID NOT NULL REFERENCES accounts_payable(id) ON DELETE CASCADE,
-      amount NUMERIC(12,2) DEFAULT 0,
-      check_date DATE,
-      voucher VARCHAR(100),
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
-  
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS ap_trucking (
-      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-      ap_id UUID NOT NULL REFERENCES accounts_payable(id) ON DELETE CASCADE,
-      type VARCHAR(20) CHECK (type IN ('ORIGIN','DESTINATION')) NOT NULL,
-      amount NUMERIC(12,2) DEFAULT 0,
-      check_date DATE,
-      voucher VARCHAR(100),
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
-  
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS ap_port_charges (
-      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-      ap_id UUID NOT NULL REFERENCES accounts_payable(id) ON DELETE CASCADE,
-      charge_type VARCHAR(30) CHECK (charge_type IN (
-        'CRAINAGE', 'ARRASTRE_ORIGIN', 'ARRASTRE_DEST',
-        'WHARFAGE_ORIGIN', 'WHARFAGE_DEST',
-        'LABOR_ORIGIN', 'LABOR_DEST'
-      )) NOT NULL,
-      payee VARCHAR(255),
-      amount NUMERIC(12,2) DEFAULT 0,
-      check_date DATE,
-      voucher VARCHAR(100),
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
-  
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS ap_misc_charges (
-      id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-      ap_id UUID NOT NULL REFERENCES accounts_payable(id) ON DELETE CASCADE,
-      charge_type VARCHAR(30) CHECK (charge_type IN (
-        'REBATES', 'STORAGE', 'FACILITATION', 'DENR'
-      )) NOT NULL,
-      payee VARCHAR(255),
-      amount NUMERIC(12,2) DEFAULT 0,
-      check_date DATE,
-      voucher VARCHAR(100),
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
-  
+  CREATE TABLE IF NOT EXISTS accounts_payable (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+`);
+
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS ap_freight (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ap_id UUID NOT NULL REFERENCES accounts_payable(id) ON DELETE CASCADE,
+    amount NUMERIC(12,2) DEFAULT 0,
+    check_date DATE,
+    voucher VARCHAR(100),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(ap_id)
+  );
+`);
+
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS ap_trucking (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ap_id UUID NOT NULL REFERENCES accounts_payable(id) ON DELETE CASCADE,
+    type VARCHAR(20) CHECK (type IN ('ORIGIN','DESTINATION')) NOT NULL,
+    amount NUMERIC(12,2) DEFAULT 0,
+    check_date DATE,
+    voucher VARCHAR(100),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(ap_id, type)
+  );
+`);
+
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS ap_port_charges (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ap_id UUID NOT NULL REFERENCES accounts_payable(id) ON DELETE CASCADE,
+    charge_type VARCHAR(30) CHECK (charge_type IN (
+      'CRAINAGE', 'ARRASTRE_ORIGIN', 'ARRASTRE_DEST',
+      'WHARFAGE_ORIGIN', 'WHARFAGE_DEST',
+      'LABOR_ORIGIN', 'LABOR_DEST'
+    )) NOT NULL,
+    payee VARCHAR(255),
+    amount NUMERIC(12,2) DEFAULT 0,
+    check_date DATE,
+    voucher VARCHAR(100),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(ap_id, charge_type)
+  );
+`);
+
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS ap_misc_charges (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ap_id UUID NOT NULL REFERENCES accounts_payable(id) ON DELETE CASCADE,
+    charge_type VARCHAR(30) CHECK (charge_type IN (
+      'REBATES', 'STORAGE', 'FACILITATION', 'DENR'
+    )) NOT NULL,
+    payee VARCHAR(255),
+    amount NUMERIC(12,2) DEFAULT 0,
+    check_date DATE,
+    voucher VARCHAR(100),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(ap_id, charge_type)
+  );
+`);
   
 // ==================== INDEXES ====================
 await pool.query(`

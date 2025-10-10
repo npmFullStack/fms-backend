@@ -221,6 +221,44 @@ class AP {
       client.release();
     }
   }
+  
+
+static async getByBookingNumber(bookingNumber) {
+    const query = `
+      SELECT 
+        ap.*,
+        b.*,
+        sl.name as freight_payee,
+        pt.name as trucking_origin_payee,
+        dt.name as trucking_dest_payee,
+        
+        af.amount as freight_amount,
+        af.check_date as freight_check_date,
+        af.voucher as freight_voucher,
+        
+        ato.amount as trucking_origin_amount,
+        ato.check_date as trucking_origin_check_date,
+        ato.voucher as trucking_origin_voucher,
+        
+        atd.amount as trucking_dest_amount,
+        atd.check_date as trucking_dest_check_date,
+        atd.voucher as trucking_dest_voucher
+
+      FROM accounts_payable ap
+      INNER JOIN bookings b ON ap.booking_id = b.id
+      LEFT JOIN shipping_lines sl ON b.shipping_line_id = sl.id
+      LEFT JOIN booking_truck_assignments bta ON b.id = bta.booking_id
+      LEFT JOIN trucking_companies pt ON bta.pickup_trucker_id = pt.id
+      LEFT JOIN trucking_companies dt ON bta.delivery_trucker_id = dt.id
+      LEFT JOIN ap_freight af ON ap.id = af.ap_id
+      LEFT JOIN ap_trucking ato ON ap.id = ato.ap_id AND ato.type = 'ORIGIN'
+      LEFT JOIN ap_trucking atd ON ap.id = atd.ap_id AND atd.type = 'DESTINATION'
+      WHERE b.booking_number = $1 OR b.hwb_number = $1;
+    `;
+    
+    const result = await pool.query(query, [bookingNumber]);
+    return result.rows[0];
+}
 }
 
 export default AP;
