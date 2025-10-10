@@ -1,6 +1,6 @@
--- ===========================
--- DROP EXISTING OBJECTS FIRST
--- ===========================
+-- ======================================================
+-- 🧹 DROP EXISTING OBJECTS FIRST
+-- ======================================================
 
 -- Drop triggers
 DO $$
@@ -13,18 +13,31 @@ BEGIN
     END LOOP;
 END $$;
 
--- Drop tables (in reverse dependency order)
+-- Drop view
+DROP VIEW IF EXISTS booking_summary CASCADE;
+
+-- Drop tables (reverse dependency order)
+DROP TABLE IF EXISTS ap_misc_charges CASCADE;
+DROP TABLE IF EXISTS ap_port_charges CASCADE;
+DROP TABLE IF EXISTS ap_trucking CASCADE;
+DROP TABLE IF EXISTS ap_freight CASCADE;
+DROP TABLE IF EXISTS accounts_payable CASCADE;
+DROP TABLE IF EXISTS notifications CASCADE;
+DROP TABLE IF EXISTS paymongo_payments CASCADE;
+DROP TABLE IF EXISTS booking_status_history CASCADE;
 DROP TABLE IF EXISTS booking_containers CASCADE;
+DROP TABLE IF EXISTS booking_delivery_addresses CASCADE;
+DROP TABLE IF EXISTS booking_pickup_addresses CASCADE;
+DROP TABLE IF EXISTS booking_truck_assignments CASCADE;
+DROP TABLE IF EXISTS booking_consignee_details CASCADE;
+DROP TABLE IF EXISTS booking_shipper_details CASCADE;
 DROP TABLE IF EXISTS bookings CASCADE;
-DROP TABLE IF EXISTS truck_details CASCADE;
 DROP TABLE IF EXISTS trucks CASCADE;
-DROP TABLE IF EXISTS trucking_company_details CASCADE;
 DROP TABLE IF EXISTS trucking_companies CASCADE;
 DROP TABLE IF EXISTS containers CASCADE;
-DROP TABLE IF EXISTS ship_details CASCADE;
 DROP TABLE IF EXISTS ships CASCADE;
-DROP TABLE IF EXISTS shipping_line_details CASCADE;
 DROP TABLE IF EXISTS shipping_lines CASCADE;
+DROP TABLE IF EXISTS password_resets CASCADE;
 DROP TABLE IF EXISTS user_details CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 
@@ -33,20 +46,21 @@ DROP SEQUENCE IF EXISTS booking_number_seq CASCADE;
 DROP SEQUENCE IF EXISTS hwb_number_seq CASCADE;
 
 -- Drop types
+DROP TYPE IF EXISTS paymongo_status CASCADE;
 DROP TYPE IF EXISTS booking_status CASCADE;
 DROP TYPE IF EXISTS payment_status CASCADE;
 DROP TYPE IF EXISTS booking_mode CASCADE;
 DROP TYPE IF EXISTS container_type CASCADE;
 DROP TYPE IF EXISTS user_role CASCADE;
 
--- ===========================
--- EXTENSIONS
--- ===========================
+-- ======================================================
+-- 🧩 EXTENSIONS
+-- ======================================================
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- ===========================
--- ENUM TYPES
--- ===========================
+-- ======================================================
+-- 🧱 ENUM TYPES
+-- ======================================================
 CREATE TYPE user_role AS ENUM ('customer', 'marketing_coordinator', 'admin_finance', 'general_manager');
 CREATE TYPE container_type AS ENUM ('LCL', '20FT', '40FT');
 CREATE TYPE booking_mode AS ENUM ('DOOR_TO_DOOR', 'PIER_TO_PIER');
@@ -61,10 +75,11 @@ CREATE TYPE booking_status AS ENUM (
     'OUT_FOR_DELIVERY',
     'DELIVERED'
 );
+CREATE TYPE paymongo_status AS ENUM ('PENDING', 'SUCCEEDED', 'FAILED', 'CANCELED');
 
--- ===========================
--- FUNCTIONS
--- ===========================
+-- ======================================================
+-- ⚙️ FUNCTIONS
+-- ======================================================
 CREATE OR REPLACE FUNCTION update_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -73,17 +88,15 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- ===========================
--- SEQUENCES
--- ===========================
+-- ======================================================
+-- 🔢 SEQUENCES
+-- ======================================================
 CREATE SEQUENCE IF NOT EXISTS booking_number_seq START 1;
 CREATE SEQUENCE IF NOT EXISTS hwb_number_seq START 1;
 
--- ===========================
--- TABLES
--- ===========================
-
--- USERS
+-- ======================================================
+-- 👤 USERS
+-- ======================================================
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(100) UNIQUE NOT NULL,
@@ -104,19 +117,23 @@ CREATE TABLE user_details (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- SHIPPING LINES
+CREATE TABLE password_resets (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token TEXT NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ======================================================
+-- 🚢 SHIPPING
+-- ======================================================
 CREATE TABLE shipping_lines (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(150) UNIQUE NOT NULL,
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE shipping_line_details (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    shipping_line_id UUID NOT NULL REFERENCES shipping_lines(id) ON DELETE CASCADE,
     logo_url TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -130,38 +147,26 @@ CREATE TABLE ships (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE ship_details (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    ship_id UUID NOT NULL UNIQUE REFERENCES ships(id) ON DELETE CASCADE,
-    remarks TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
 CREATE TABLE containers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     shipping_line_id UUID NOT NULL REFERENCES shipping_lines(id) ON DELETE CASCADE,
     size container_type NOT NULL,
     van_number VARCHAR(100) NOT NULL,
     is_returned BOOLEAN DEFAULT TRUE,
+    returned_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (shipping_line_id, van_number)
 );
 
--- TRUCKING
+-- ======================================================
+-- 🚛 TRUCKING
+-- ======================================================
 CREATE TABLE trucking_companies (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(150) UNIQUE NOT NULL,
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE TABLE trucking_company_details (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    trucking_company_id UUID NOT NULL REFERENCES trucking_companies(id) ON DELETE CASCADE,
     logo_url TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -176,64 +181,71 @@ CREATE TABLE trucks (
     UNIQUE (trucking_company_id, name)
 );
 
-CREATE TABLE truck_details (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    truck_id UUID NOT NULL UNIQUE REFERENCES trucks(id) ON DELETE CASCADE,
-    remarks TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- BOOKINGS
+-- ======================================================
+-- 📦 BOOKINGS
+-- ======================================================
 CREATE TABLE bookings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    
-    shipper VARCHAR(150) NOT NULL,
-    first_name VARCHAR(100),
-    last_name VARCHAR(100),
-    phone VARCHAR(20),
-    
-    consignee VARCHAR(150) NOT NULL,
-    consignee_name VARCHAR(100),
-    consignee_phone VARCHAR(20),
-    
     shipping_line_id UUID NOT NULL REFERENCES shipping_lines(id) ON DELETE CASCADE,
     ship_id UUID REFERENCES ships(id) ON DELETE SET NULL,
     quantity INTEGER DEFAULT 1,
     booking_mode booking_mode NOT NULL,
     commodity VARCHAR(200) NOT NULL,
-    
     origin_port VARCHAR(100) NOT NULL,
     destination_port VARCHAR(100) NOT NULL,
+    status booking_status DEFAULT 'PICKUP_SCHEDULED',
+    payment_status payment_status DEFAULT 'PENDING',
+    booking_number VARCHAR(50) UNIQUE,
+    hwb_number VARCHAR(50) UNIQUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
-    pickup_province VARCHAR(255),
-    pickup_city VARCHAR(255),
-    pickup_barangay VARCHAR(255),
-    pickup_street VARCHAR(255),
-    
-    delivery_province VARCHAR(255),
-    delivery_city VARCHAR(255),
-    delivery_barangay VARCHAR(255),
-    delivery_street VARCHAR(255),
+CREATE TABLE booking_shipper_details (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+    company_name VARCHAR(150) NOT NULL,
+    first_name VARCHAR(100),
+    last_name VARCHAR(100),
+    phone VARCHAR(20)
+);
 
+CREATE TABLE booking_consignee_details (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+    company_name VARCHAR(150) NOT NULL,
+    contact_name VARCHAR(100),
+    phone VARCHAR(20)
+);
+
+CREATE TABLE booking_truck_assignments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
     pickup_trucker_id UUID REFERENCES trucking_companies(id) ON DELETE SET NULL,
     pickup_truck_id UUID REFERENCES trucks(id) ON DELETE SET NULL,
     delivery_trucker_id UUID REFERENCES trucking_companies(id) ON DELETE SET NULL,
     delivery_truck_id UUID REFERENCES trucks(id) ON DELETE SET NULL,
-
-    actual_departure DATE,
-    actual_arrival DATE,
-    actual_delivery DATE,
-    
-    status booking_status DEFAULT 'PICKUP_SCHEDULED',
-    payment_status payment_status DEFAULT 'PENDING',
-    
-    booking_number VARCHAR(50) UNIQUE,
-    hwb_number VARCHAR(50) UNIQUE,
-    
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE booking_pickup_addresses (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+    province VARCHAR(255),
+    city VARCHAR(255),
+    barangay VARCHAR(255),
+    street VARCHAR(255)
+);
+
+CREATE TABLE booking_delivery_addresses (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+    province VARCHAR(255),
+    city VARCHAR(255),
+    barangay VARCHAR(255),
+    street VARCHAR(255)
 );
 
 CREATE TABLE booking_containers (
@@ -246,77 +258,291 @@ CREATE TABLE booking_containers (
     UNIQUE(booking_id, sequence_number)
 );
 
--- ===========================
--- INDEXES
--- ===========================
+CREATE TABLE booking_status_history (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+    status booking_status NOT NULL,
+    status_date TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ======================================================
+-- 💸 PAYMENTS
+-- ======================================================
+CREATE TABLE paymongo_payments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+    paymongo_payment_intent_id VARCHAR(255) UNIQUE NOT NULL,
+    paymongo_checkout_session_id VARCHAR(255) UNIQUE,
+    amount NUMERIC(12,2) NOT NULL,
+    currency VARCHAR(10) NOT NULL DEFAULT 'PHP',
+    status paymongo_status DEFAULT 'PENDING',
+    payment_method VARCHAR(50) DEFAULT 'GCASH',
+    reference_number VARCHAR(100),
+    payment_date TIMESTAMPTZ DEFAULT NOW(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ======================================================
+-- 🔔 NOTIFICATIONS
+-- ======================================================
+CREATE TABLE notifications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    type VARCHAR(50) NOT NULL,
+    entity_type VARCHAR(50),
+    entity_id UUID,
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ======================================================
+-- 📊 ACCOUNTS PAYABLE
+-- ======================================================
+CREATE TABLE accounts_payable (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE ap_freight (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ap_id UUID NOT NULL REFERENCES accounts_payable(id) ON DELETE CASCADE,
+    amount NUMERIC(12,2) DEFAULT 0,
+    check_date DATE,
+    voucher VARCHAR(100),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE ap_trucking (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ap_id UUID NOT NULL REFERENCES accounts_payable(id) ON DELETE CASCADE,
+    type VARCHAR(20) CHECK (type IN ('ORIGIN','DESTINATION')) NOT NULL,
+    amount NUMERIC(12,2) DEFAULT 0,
+    check_date DATE,
+    voucher VARCHAR(100),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE ap_port_charges (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ap_id UUID NOT NULL REFERENCES accounts_payable(id) ON DELETE CASCADE,
+    charge_type VARCHAR(30) CHECK (charge_type IN (
+        'CRAINAGE', 'ARRASTRE_ORIGIN', 'ARRASTRE_DEST',
+        'WHARFAGE_ORIGIN', 'WHARFAGE_DEST',
+        'LABOR_ORIGIN', 'LABOR_DEST'
+    )) NOT NULL,
+    payee VARCHAR(255),
+    amount NUMERIC(12,2) DEFAULT 0,
+    check_date DATE,
+    voucher VARCHAR(100),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE ap_misc_charges (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ap_id UUID NOT NULL REFERENCES accounts_payable(id) ON DELETE CASCADE,
+    charge_type VARCHAR(30) CHECK (charge_type IN (
+        'REBATES', 'STORAGE', 'FACILITATION', 'DENR'
+    )) NOT NULL,
+    payee VARCHAR(255),
+    amount NUMERIC(12,2) DEFAULT 0,
+    check_date DATE,
+    voucher VARCHAR(100),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- ======================================================
+-- 📈 INDEXES
+-- ======================================================
 CREATE INDEX idx_containers_is_returned ON containers(is_returned);
 CREATE INDEX idx_containers_shipping_line_returned ON containers(shipping_line_id, is_returned);
 CREATE INDEX idx_booking_containers_booking_id ON booking_containers(booking_id);
 CREATE INDEX idx_booking_containers_container_id ON booking_containers(container_id);
+CREATE INDEX idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX idx_notifications_is_read ON notifications(is_read);
+CREATE INDEX idx_notifications_created_at ON notifications(created_at);
+CREATE INDEX idx_paymongo_booking_id ON paymongo_payments(booking_id);
+CREATE INDEX idx_paymongo_status ON paymongo_payments(status);
+CREATE INDEX idx_paymongo_method ON paymongo_payments(payment_method);
+CREATE INDEX idx_ap_booking_id ON accounts_payable(booking_id);
+CREATE INDEX idx_ap_freight_ap_id ON ap_freight(ap_id);
+CREATE INDEX idx_ap_trucking_ap_id ON ap_trucking(ap_id);
+CREATE INDEX idx_ap_trucking_type ON ap_trucking(type);
+CREATE INDEX idx_ap_port_charges_ap_id ON ap_port_charges(ap_id);
+CREATE INDEX idx_ap_port_charges_type ON ap_port_charges(charge_type);
+CREATE INDEX idx_ap_misc_charges_ap_id ON ap_misc_charges(ap_id);
+CREATE INDEX idx_ap_misc_charges_type ON ap_misc_charges(charge_type);
 
--- ===========================
--- TRIGGERS
--- ===========================
-CREATE TRIGGER trigger_update_updated_at_users
-BEFORE UPDATE ON users
-FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+-- ======================================================
+-- 🪄 VIEW: booking_summary
+-- ======================================================
+DROP VIEW IF EXISTS booking_summary;
+CREATE OR REPLACE VIEW booking_summary AS
+SELECT
+  b.id,
+  b.booking_number,
+  b.hwb_number,
+  b.status,
+  b.payment_status,
+  b.quantity,
+  b.booking_mode,
+  b.commodity,
+  b.origin_port,
+  b.destination_port,
+  b.shipping_line_id,
+  b.ship_id,
+  b.created_at,
+  b.updated_at,
 
-CREATE TRIGGER trigger_update_updated_at_user_details
-BEFORE UPDATE ON user_details
-FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  u.email AS created_by,
+  ud.first_name,
+  ud.last_name,
 
-CREATE TRIGGER trigger_update_updated_at_shipping_lines
-BEFORE UPDATE ON shipping_lines
-FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  sd.company_name AS shipper,
+  sd.first_name AS shipper_first_name,
+  sd.last_name AS shipper_last_name,
+  sd.phone AS shipper_phone,
 
-CREATE TRIGGER trigger_update_updated_at_shipping_line_details
-BEFORE UPDATE ON shipping_line_details
-FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  cd.company_name AS consignee,
+  cd.contact_name AS consignee_name,
+  cd.phone AS consignee_phone,
 
-CREATE TRIGGER trigger_update_updated_at_ships
-BEFORE UPDATE ON ships
-FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  (pa.city || ', ' || pa.province) AS pickup_location,
+  (da.city || ', ' || da.province) AS delivery_location,
+  pa.province AS pickup_province,
+  pa.city AS pickup_city,
+  pa.barangay AS pickup_barangay,
+  pa.street AS pickup_street,
+  da.province AS delivery_province,
+  da.city AS delivery_city,
+  da.barangay AS delivery_barangay,
+  da.street AS delivery_street,
 
-CREATE TRIGGER trigger_update_updated_at_ship_details
-BEFORE UPDATE ON ship_details
-FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  sl.name AS shipping_line_name,
+  sl.logo_url AS shipping_line_logo,
 
-CREATE TRIGGER trigger_update_updated_at_containers
-BEFORE UPDATE ON containers
-FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  s.vessel_number AS ship_vessel_number,
+  s.ship_name,
 
-CREATE TRIGGER trigger_update_updated_at_trucking_companies
-BEFORE UPDATE ON trucking_companies
-FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  pt.name AS pickup_trucker,
+  pt.id AS pickup_trucker_id,
+  ptrk.name AS pickup_truck_name,
+  ptrk.id AS pickup_truck_id,
+  dt.name AS delivery_trucker,
+  dt.id AS delivery_trucker_id,
+  dtrk.name AS delivery_truck_name,
+  dtrk.id AS delivery_truck_id,
 
-CREATE TRIGGER trigger_update_updated_at_trucking_company_details
-BEFORE UPDATE ON trucking_company_details
-FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  COUNT(DISTINCT c.id) AS container_count,
 
-CREATE TRIGGER trigger_update_updated_at_trucks
-BEFORE UPDATE ON trucks
-FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  (
+    SELECT STRING_AGG(v.van_number, ', ' ORDER BY v.van_number)
+    FROM (
+      SELECT DISTINCT c2.van_number
+      FROM booking_containers bc2
+      JOIN containers c2 ON bc2.container_id = c2.id
+      WHERE bc2.booking_id = b.id
+    ) v
+  ) AS container_vans,
 
-CREATE TRIGGER trigger_update_updated_at_truck_details
-BEFORE UPDATE ON truck_details
-FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  COALESCE(
+    (
+      SELECT JSON_AGG(container_data ORDER BY container_data->>'van_number')
+      FROM (
+        SELECT DISTINCT JSONB_BUILD_OBJECT(
+          'id', c2.id,
+          'van_number', c2.van_number,
+          'size', c2.size,
+          'is_returned', c2.is_returned,
+          'returned_date', c2.returned_date,
+          'shipping_line_id', c2.shipping_line_id
+        ) AS container_data
+        FROM booking_containers bc2
+        JOIN containers c2 ON bc2.container_id = c2.id
+        WHERE bc2.booking_id = b.id
+      ) t
+    ),
+    '[]'::json
+  ) AS containers
 
-CREATE TRIGGER trigger_update_updated_at_bookings
-BEFORE UPDATE ON bookings
-FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+FROM bookings b
+LEFT JOIN users u ON b.user_id = u.id
+LEFT JOIN user_details ud ON u.id = ud.user_id
+LEFT JOIN booking_shipper_details sd ON sd.booking_id = b.id
+LEFT JOIN booking_consignee_details cd ON cd.booking_id = b.id
+LEFT JOIN booking_pickup_addresses pa ON pa.booking_id = b.id
+LEFT JOIN booking_delivery_addresses da ON da.booking_id = b.id
+LEFT JOIN booking_containers bc ON bc.booking_id = b.id
+LEFT JOIN containers c ON bc.container_id = c.id
+LEFT JOIN shipping_lines sl ON b.shipping_line_id = sl.id
+LEFT JOIN ships s ON b.ship_id = s.id
+LEFT JOIN booking_truck_assignments bta ON b.id = bta.booking_id
+LEFT JOIN trucking_companies pt ON bta.pickup_trucker_id = pt.id
+LEFT JOIN trucks ptrk ON bta.pickup_truck_id = ptrk.id
+LEFT JOIN trucking_companies dt ON bta.delivery_trucker_id = dt.id
+LEFT JOIN trucks dtrk ON bta.delivery_truck_id = dtrk.id
 
-CREATE TRIGGER trigger_update_updated_at_booking_containers
-BEFORE UPDATE ON booking_containers
-FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+GROUP BY
+  b.id, b.booking_number, b.hwb_number, b.status, b.payment_status,
+  b.quantity, b.booking_mode, b.commodity, b.origin_port, b.destination_port,
+  b.shipping_line_id, b.ship_id, b.created_at, b.updated_at,
+  u.email, ud.first_name, ud.last_name,
+  sd.company_name, sd.first_name, sd.last_name, sd.phone,
+  cd.company_name, cd.contact_name, cd.phone,
+  pa.city, pa.province, pa.barangay, pa.street,
+  da.city, da.province, da.barangay, da.street,
+  sl.name, sl.logo_url,
+  s.vessel_number, s.ship_name,
+  pt.name, pt.id, ptrk.name, ptrk.id,
+  dt.name, dt.id, dtrk.name, dtrk.id;
 
--- ===========================
--- SEED DATA
--- ===========================
+-- ======================================================
+-- 🔥 TRIGGERS
+-- ======================================================
+DO $$
+DECLARE
+  t TEXT;
+BEGIN
+  FOR t IN
+    SELECT unnest(ARRAY[
+      'users',
+      'user_details',
+      'shipping_lines',
+      'ships',
+      'containers',
+      'trucking_companies',
+      'trucks',
+      'bookings',
+      'booking_containers',
+      'accounts_payable',
+      'ap_freight',
+      'ap_trucking',
+      'ap_port_charges',
+      'ap_misc_charges'
+    ])
+  LOOP
+    EXECUTE format('DROP TRIGGER IF EXISTS trigger_update_updated_at_%I ON %I', t, t);
+    EXECUTE format('CREATE TRIGGER trigger_update_updated_at_%I BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION update_updated_at()', t, t);
+  END LOOP;
+END $$;
 
+-- ======================================================
+-- 🌱 SEED DATA
+-- ======================================================
 INSERT INTO users (email, password, role)
-VALUES ('admin@gmail.com', '$2a$10$P/z4lW/t6ZmtJ8jiIiHQY.b.lTRJzcfUDiuD1bVMMdQYUDHJHmAT.', 'general_manager')
+VALUES ('gm@gmail.com', '$2a$10$P/z4lW/t6ZmtJ8jiIiHQY.b.lTRJzcfUDiuD1bVMMdQYUDHJHmAT.', 'general_manager')
 ON CONFLICT (email) DO NOTHING;
 
 INSERT INTO user_details (user_id, first_name, last_name)
-SELECT id, 'Admin', 'User' FROM users WHERE email = 'admin@gmail.com'
+SELECT id, 'Admin', 'User' FROM users WHERE email = 'gm@gmail.com'
 ON CONFLICT (user_id) DO NOTHING;
