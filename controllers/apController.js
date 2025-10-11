@@ -97,40 +97,6 @@ export const updateAP = async (req, res) => {
     }
 };
 
-// Create missing AP records for existing bookings - UPDATED
-export const createMissingAPRecords = async (req, res) => {
-    try {
-        const createdRecords = await AP.createMissingRecords();
-
-        // Send notification if records were created
-        if (createdRecords.length > 0) {
-            const fullName = await getUserFullName(req.user?.id);
-
-            // Get reference numbers for the notification message
-            const referenceNumbers = createdRecords.map(record => 
-                record.hwb_number || record.booking_number
-            ).join(', ');
-
-            await notifyMultipleRoles(["admin_finance", "general_manager"], {
-                title: "Missing AP Records Created",
-                message: `${fullName} created ${createdRecords.length} missing AP records for: ${referenceNumbers}.`,
-                type: "ap",
-                entity_type: "ap_batch",
-                entity_id: null,
-            });
-        }
-
-        res.json({
-            message: `Created ${createdRecords.length} missing AP records`,
-            createdRecords
-        });
-    } catch (err) {
-        res.status(500).json({
-            message: "Failed to create missing AP records",
-            error: err.message
-        });
-    }
-};
 
 // Get AP by booking ID
 export const getAPByBookingId = async (req, res) => {
@@ -151,44 +117,6 @@ export const getAPByBookingId = async (req, res) => {
     } catch (err) {
         res.status(500).json({
             message: "Failed to fetch AP record",
-            error: err.message
-        });
-    }
-};
-
-// Create AP record - UPDATED
-export const createAP = async (req, res) => {
-    try {
-        const { booking_id } = req.body;
-
-        // Create AP record
-        const apRecord = await AP.createForBooking(booking_id);
-        
-        // Get the full AP record with booking details for notification
-        const fullAPRecord = await AP.getById(apRecord.id);
-
-        // Send notification to admin_finance and gm - UPDATED
-        const fullName = await getUserFullName(req.user?.id);
-        
-        // Use HWB number if available, otherwise use booking number
-        const referenceNumber = fullAPRecord.hwb_number || fullAPRecord.booking_number;
-        const referenceType = fullAPRecord.hwb_number ? 'HWB' : 'Booking';
-
-        await notifyMultipleRoles(["admin_finance", "general_manager"], {
-            title: "New AP Record Created",
-            message: `${fullName} created a new AP record for ${referenceType} #${referenceNumber}.`,
-            type: "ap",
-            entity_type: "ap",
-            entity_id: apRecord.id,
-        });
-
-        res.status(201).json({
-            message: "AP record created successfully",
-            apRecord: fullAPRecord
-        });
-    } catch (err) {
-        res.status(400).json({
-            message: "Failed to create AP record",
             error: err.message
         });
     }
