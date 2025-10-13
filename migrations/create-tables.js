@@ -312,6 +312,20 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 `);
 
+// ========================= ACCOUNTS_RECEIVABLE ==========================
+await pool.query(`
+CREATE TABLE IF NOT EXISTS accounts_receivable (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  amount_paid NUMERIC(12,2) DEFAULT 0,
+  payment_date DATE,
+  aging INTEGER DEFAULT 0, -- days between payment_date and booking creation
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(booking_id)
+);
+`);
+
 // ================== ACCOUNTS_PAYABLE ====================
 await pool.query(`
   CREATE TABLE IF NOT EXISTS accounts_payable (
@@ -398,7 +412,8 @@ await pool.query(`
   CREATE INDEX IF NOT EXISTS idx_paymongo_booking_id ON paymongo_payments(booking_id);
   CREATE INDEX IF NOT EXISTS idx_paymongo_status ON paymongo_payments(status);
   CREATE INDEX IF NOT EXISTS idx_paymongo_method ON paymongo_payments(payment_method);
-
+CREATE INDEX IF NOT EXISTS idx_ar_booking_id ON accounts_receivable(booking_id);
+CREATE INDEX IF NOT EXISTS idx_ar_payment_date ON accounts_receivable(payment_date);
   -- 🆕 AP-related indexes
   CREATE INDEX IF NOT EXISTS idx_ap_booking_id ON accounts_payable(booking_id);
 

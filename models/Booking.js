@@ -6,127 +6,141 @@ class Booking {
   // Create new booking
   static async create(bookingData) {
     const {
-      user_id,
-      shipper,
-      first_name,
-      last_name,
-      phone,
-      consignee,
-      consignee_name,
-      consignee_phone,
-      shipping_line_id,
-      ship_id,
-      container_ids = [],
-      quantity,
-      booking_mode,
-      commodity,
-      origin_port,
-      destination_port,
-      pickup_province,
-      pickup_city,
-      pickup_barangay,
-      pickup_street,
-      delivery_province,
-      delivery_city,
-      delivery_barangay,
-      delivery_street,
-      pickup_trucker_id,
-      pickup_truck_id,
-      delivery_trucker_id,
-      delivery_truck_id
-    } = bookingData;
-
-    // Insert into bookings
-    const bookingResult = await pool.query(
-      `INSERT INTO bookings (
-        user_id, shipping_line_id, ship_id, quantity, booking_mode,
-        commodity, origin_port, destination_port,
-        booking_number, hwb_number
-      )
-      VALUES (
-        $1,$2,$3,$4,$5,
-        $6,$7,$8,
-        'BKG-' || LPAD(nextval('booking_number_seq')::text, 4, '0'),
-        'HWB-' || LPAD(nextval('hwb_number_seq')::text, 4, '0')
-      )
-      RETURNING *`,
-      [
         user_id,
+        shipper,
+        first_name,
+        last_name,
+        phone,
+        consignee,
+        consignee_name,
+        consignee_phone,
         shipping_line_id,
         ship_id,
+        container_ids = [],
         quantity,
         booking_mode,
         commodity,
         origin_port,
-        destination_port
-      ]
-    );
-
-    const booking = bookingResult.rows[0];
-
-    // Insert shipper details
-    await pool.query(
-      `INSERT INTO booking_shipper_details 
-      (booking_id, company_name, first_name, last_name, phone)
-      VALUES ($1,$2,$3,$4,$5)`,
-      [booking.id, shipper, first_name, last_name, phone]
-    );
-
-    // Insert consignee details
-    await pool.query(
-      `INSERT INTO booking_consignee_details
-      (booking_id, company_name, contact_name, phone)
-      VALUES ($1,$2,$3,$4)`,
-      [booking.id, consignee, consignee_name, consignee_phone]
-    );
-
-    // Insert pickup address
-    await pool.query(
-      `INSERT INTO booking_pickup_addresses
-      (booking_id, province, city, barangay, street)
-      VALUES ($1,$2,$3,$4,$5)`,
-      [booking.id, pickup_province, pickup_city, pickup_barangay, pickup_street]
-    );
-
-    // Insert delivery address
-    await pool.query(
-      `INSERT INTO booking_delivery_addresses
-      (booking_id, province, city, barangay, street)
-      VALUES ($1,$2,$3,$4,$5)`,
-      [booking.id, delivery_province, delivery_city, delivery_barangay, delivery_street]
-    );
-
-    // Insert containers
-    if (container_ids.length > 0) {
-      for (let i = 0; i < container_ids.length; i++) {
-        await pool.query(
-          `INSERT INTO booking_containers (booking_id, container_id, sequence_number)
-           VALUES ($1,$2,$3)`,
-          [booking.id, container_ids[i], i + 1]
-        );
-        await pool.query(
-          `UPDATE containers SET is_returned=FALSE WHERE id=$1`,
-          [container_ids[i]]
-        );
-      }
-    }
-
-    // Insert trucking assignment
-    await pool.query(
-      `INSERT INTO booking_truck_assignments
-       (booking_id, pickup_trucker_id, pickup_truck_id, delivery_trucker_id, delivery_truck_id)
-       VALUES ($1,$2,$3,$4,$5)`,
-      [
-        booking.id,
+        destination_port,
+        pickup_province,
+        pickup_city,
+        pickup_barangay,
+        pickup_street,
+        delivery_province,
+        delivery_city,
+        delivery_barangay,
+        delivery_street,
         pickup_trucker_id,
         pickup_truck_id,
         delivery_trucker_id,
         delivery_truck_id
-      ]
-    );
+    } = bookingData;
 
-    return booking;
-  }
+    const client = await pool.connect();
+    
+    try {
+        await client.query('BEGIN');
+
+        // Insert into bookings
+        const bookingResult = await client.query(
+            `INSERT INTO bookings (
+                user_id, shipping_line_id, ship_id, quantity, booking_mode,
+                commodity, origin_port, destination_port,
+                booking_number, hwb_number
+            )
+            VALUES (
+                $1, $2, $3, $4, $5,
+                $6, $7, $8,
+                'BKG-' || LPAD(nextval('booking_number_seq')::text, 4, '0'),
+                'HWB-' || LPAD(nextval('hwb_number_seq')::text, 4, '0')
+            )
+            RETURNING *`,
+            [
+                user_id,
+                shipping_line_id,
+                ship_id,
+                quantity,
+                booking_mode,
+                commodity,
+                origin_port,
+                destination_port
+            ]
+        );
+
+        const booking = bookingResult.rows[0];
+
+        // Insert shipper details
+        await client.query(
+            'INSERT INTO booking_shipper_details (booking_id, company_name, first_name, last_name, phone) VALUES ($1, $2, $3, $4, $5)',
+            [booking.id, shipper, first_name, last_name, phone]
+        );
+
+        // Insert consignee details
+        await client.query(
+            'INSERT INTO booking_consignee_details (booking_id, company_name, contact_name, phone) VALUES ($1, $2, $3, $4)',
+            [booking.id, consignee, consignee_name, consignee_phone]
+        );
+
+        // Insert pickup address
+        await client.query(
+            'INSERT INTO booking_pickup_addresses (booking_id, province, city, barangay, street) VALUES ($1, $2, $3, $4, $5)',
+            [booking.id, pickup_province, pickup_city, pickup_barangay, pickup_street]
+        );
+
+        // Insert delivery address
+        await client.query(
+            'INSERT INTO booking_delivery_addresses (booking_id, province, city, barangay, street) VALUES ($1, $2, $3, $4, $5)',
+            [booking.id, delivery_province, delivery_city, delivery_barangay, delivery_street]
+        );
+
+        // Insert containers
+        if (container_ids.length > 0) {
+            for (let i = 0; i < container_ids.length; i++) {
+                await client.query(
+                    'INSERT INTO booking_containers (booking_id, container_id, sequence_number) VALUES ($1, $2, $3)',
+                    [booking.id, container_ids[i], i + 1]
+                );
+                await client.query(
+                    'UPDATE containers SET is_returned=FALSE WHERE id=$1',
+                    [container_ids[i]]
+                );
+            }
+        }
+
+        // Insert trucking assignment
+        await client.query(
+            'INSERT INTO booking_truck_assignments (booking_id, pickup_trucker_id, pickup_truck_id, delivery_trucker_id, delivery_truck_id) VALUES ($1, $2, $3, $4, $5)',
+            [
+                booking.id,
+                pickup_trucker_id,
+                pickup_truck_id,
+                delivery_trucker_id,
+                delivery_truck_id
+            ]
+        );
+
+        // Create accounts receivable record
+        await client.query(
+            'INSERT INTO accounts_receivable (booking_id) VALUES ($1)',
+            [booking.id]
+        );
+
+        // Create accounts payable record
+        await client.query(
+            'INSERT INTO accounts_payable (booking_id) VALUES ($1)',
+            [booking.id]
+        );
+
+        await client.query('COMMIT');
+        return booking;
+
+    } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+    } finally {
+        client.release();
+    }
+}
 
   // Update booking
   static async update(id, bookingData) {

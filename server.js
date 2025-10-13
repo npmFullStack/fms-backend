@@ -17,7 +17,8 @@ import courierRoutes from "./routes/courierRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import webhookRoutes from "./routes/webhookRoutes.js";
-import apRoutes from "./routes/apRoutes.js"; // AP routes
+import arRoutes from "./routes/arRoutes.js";
+import apRoutes from "./routes/apRoutes.js";
 
 const app = express();
 
@@ -48,7 +49,8 @@ app.use("/bookings", bookingRoutes);
 app.use("/couriers", courierRoutes);
 app.use("/notifications", notificationRoutes);
 app.use("/payments", paymentRoutes);
-app.use("/ap", apRoutes); // AP routes
+app.use("/ap", apRoutes);
+app.use("/ar", arRoutes);
 
 // Health check
 app.get("/health", (req, res) => {

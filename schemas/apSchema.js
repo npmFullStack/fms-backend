@@ -1,10 +1,6 @@
 // backend/schemas/apSchema.js
 import { z } from "zod";
 
-/**
- * Helper to convert any incoming value (string, empty, undefined)
- * into a number before Zod validation
- */
 const toNumber = (val) => {
     if (val === "" || val === undefined || val === null) return 0;
     return Number(val);
