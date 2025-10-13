@@ -319,7 +319,8 @@ CREATE TABLE IF NOT EXISTS accounts_receivable (
   booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
   amount_paid NUMERIC(12,2) DEFAULT 0,
   payment_date DATE,
-  aging INTEGER DEFAULT 0, -- days between payment_date and booking creation
+  terms INTEGER DEFAULT 0,
+  aging INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(booking_id)

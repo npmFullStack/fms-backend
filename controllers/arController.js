@@ -50,35 +50,6 @@ export const arController = {
     }
   },
 
-  // Create AR record
-  async createAR(req, res) {
-    try {
-      const validatedData = createARSchema.parse(req.body);
-      const arRecord = await AR.createForBooking(validatedData.booking_id);
-      
-      res.status(201).json({
-        success: true,
-        message: 'AR record created successfully',
-        data: arRecord
-      });
-    } catch (error) {
-      console.error('Create AR error:', error);
-      
-      if (error.name === 'ZodError') {
-        return res.status(400).json({
-          success: false,
-          message: 'Validation failed',
-          errors: error.errors
-        });
-      }
-      
-      res.status(500).json({
-        success: false,
-        message: 'Failed to create AR record',
-        error: error.message
-      });
-    }
-  },
 
   // Update AR record
   async updateAR(req, res) {
@@ -140,42 +111,4 @@ export const arController = {
     }
   },
 
-  // Create missing AR records from bookings
-  async createMissingAR(req, res) {
-    try {
-      const createdRecords = await AR.createMissingRecords();
-      
-      res.json({
-        success: true,
-        message: `Created ${createdRecords.length} missing AR records`,
-        data: createdRecords
-      });
-    } catch (error) {
-      console.error('Create missing AR error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to create missing AR records',
-        error: error.message
-      });
-    }
-  },
-
-  // Get AR statistics
-  async getARStats(req, res) {
-    try {
-      const stats = await AR.getStats();
-      
-      res.json({
-        success: true,
-        data: stats
-      });
-    } catch (error) {
-      console.error('Get AR stats error:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch AR statistics',
-        error: error.message
-      });
-    }
-  }
 };

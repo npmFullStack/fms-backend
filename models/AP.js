@@ -1,30 +1,7 @@
 import { pool } from "../db/index.js";
 
 class AP {
-  // Create AP record for a booking
-  static async createForBooking(bookingId) {
-    const query = `
-      INSERT INTO accounts_payable (booking_id) 
-      VALUES ($1) 
-      RETURNING *;
-    `;
-    
-    const result = await pool.query(query, [bookingId]);
-    return result.rows[0];
-  }
 
-  // Create missing AP records for existing bookings
-  static async createMissingRecords() {
-    const query = `
-      INSERT INTO accounts_payable (booking_id)
-      SELECT id FROM bookings 
-      WHERE id NOT IN (SELECT booking_id FROM accounts_payable)
-      RETURNING *;
-    `;
-    
-    const result = await pool.query(query);
-    return result.rows;
-  }
 
   // Get AP by booking ID
   static async getByBookingId(bookingId) {

@@ -2,30 +2,6 @@
 import { pool } from "../db/index.js";
 
 class AR {
-    // Create AR record for a booking
-    static async createForBooking(bookingId) {
-        const query = `
-            INSERT INTO accounts_receivable (booking_id)
-            VALUES ($1)
-            RETURNING *;
-        `;
-
-        const result = await pool.query(query, [bookingId]);
-        return result.rows[0];
-    }
-
-    // Create missing AR records for existing bookings
-    static async createMissingRecords() {
-        const query = `
-            INSERT INTO accounts_receivable (booking_id)
-            SELECT id FROM bookings
-            WHERE id NOT IN (SELECT booking_id FROM accounts_receivable)
-            RETURNING *;
-        `;
-
-        const result = await pool.query(query);
-        return result.rows;
-    }
 
     // Get AR by booking ID
     static async getByBookingId(bookingId) {
@@ -46,6 +22,7 @@ class AR {
                 ar.booking_id,
                 ar.amount_paid,
                 ar.payment_date,
+                ar.terms,
                 ar.aging,
                 ar.created_at,
                 ar.updated_at,
@@ -87,7 +64,14 @@ class AR {
                 CASE
                     WHEN ar.amount_paid > 0 THEN 'PARTIAL'
                     ELSE 'UNPAID'
-                END as ar_payment_status
+                END as ar_payment_status,
+
+                -- Terms status indicator
+                CASE
+                    WHEN ar.terms > 0 AND EXTRACT(DAY FROM (NOW() - b.created_at)) > ar.terms THEN 'OVERDUE'
+                    WHEN ar.terms > 0 THEN 'WITHIN_TERMS'
+                    ELSE 'NO_TERMS'
+                END as terms_status
 
             FROM accounts_receivable ar
             INNER JOIN bookings b ON ar.booking_id = b.id
@@ -119,7 +103,14 @@ class AR {
                 COALESCE(ar.amount_paid, 0) as paid_amount,
 
                 -- Route information
-                CONCAT(b.origin_port, ' → ', b.destination_port) as route
+                CONCAT(b.origin_port, ' → ', b.destination_port) as route,
+
+                -- Terms status
+                CASE
+                    WHEN ar.terms > 0 AND EXTRACT(DAY FROM (NOW() - b.created_at)) > ar.terms THEN 'OVERDUE'
+                    WHEN ar.terms > 0 THEN 'WITHIN_TERMS'
+                    ELSE 'NO_TERMS'
+                END as terms_status
 
             FROM accounts_receivable ar
             INNER JOIN bookings b ON ar.booking_id = b.id
@@ -160,15 +151,17 @@ class AR {
                 UPDATE accounts_receivable
                 SET amount_paid = $1,
                     payment_date = $2,
-                    aging = $3,
+                    terms = $3,
+                    aging = $4,
                     updated_at = NOW()
-                WHERE id = $4
+                WHERE id = $5
                 RETURNING *;
             `;
 
             const result = await client.query(updateQuery, [
                 data.amount_paid || 0,
                 data.payment_date || null,
+                data.terms || 0,
                 aging,
                 arId
             ]);
@@ -203,23 +196,7 @@ class AR {
         return result.rows[0];
     }
 
-    // Get AR statistics
-    static async getStats() {
-        const query = `
-            SELECT
-                COUNT(*) as total_count,
-                SUM(COALESCE(ar.amount_paid, 0)) as total_collected,
-                COUNT(CASE WHEN ar.amount_paid > 0 THEN 1 END) as partially_paid_count,
-                COUNT(CASE WHEN ar.amount_paid = 0 THEN 1 END) as unpaid_count,
-                COUNT(CASE WHEN ar.aging > 30 THEN 1 END) as overdue_count
 
-            FROM accounts_receivable ar
-            INNER JOIN bookings b ON ar.booking_id = b.id;
-        `;
-
-        const result = await pool.query(query);
-        return result.rows[0];
-    }
 }
 
 export default AR;

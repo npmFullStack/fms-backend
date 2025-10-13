@@ -76,6 +76,7 @@ async function resetDatabase() {
         ap_trucking,
         ap_freight,
         accounts_payable,
+        accounts_receivable,
         notifications,
         paymongo_payments,
         booking_status_history,
