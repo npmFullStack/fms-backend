@@ -1,11 +1,9 @@
 // controllers/bookingController
-
 import {
     bookingSchema,
     bookingUpdateSchema
 } from "../schemas/bookingSchema.js";
 import Booking from "../models/Booking.js";
-import AP from "../models/AP.js"; // Import the AP model
 import { notifyMultipleRoles, getUserFullName } from "../utils/notificationService.js";
 
 // Create a new booking
@@ -24,8 +22,6 @@ export const createBooking = async (req, res) => {
       ...validated,
       user_id: req.user?.id || null,
     });
-
-    await AP.createForBooking(booking.id);
 
     const fullName = await getUserFullName(req.user?.id);
 
