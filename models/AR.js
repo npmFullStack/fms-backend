@@ -128,68 +128,117 @@ class AR {
         return result.rows[0];
     }
 
-    // ✅ UPDATED: Update AR record with collectible_amount
-    static async update(arId, data) {
-        const client = await pool.connect();
+   // models/AR.js - Update the update method
+static async update(arId, data) {
+    const client = await pool.connect();
 
-        try {
-            await client.query('BEGIN');
+    try {
+        await client.query('BEGIN');
 
-            let aging = null;
+        let aging = null;
 
-            // Calculate aging if payment_date is provided
-            if (data.payment_date) {
-                const bookingQuery = `
-                    SELECT created_at FROM bookings
-                    WHERE id = (SELECT booking_id FROM accounts_receivable WHERE id = $1)
-                `;
-                const bookingResult = await client.query(bookingQuery, [arId]);
-
-                if (bookingResult.rows[0]) {
-                    const bookingDate = new Date(bookingResult.rows[0].created_at);
-                    const paymentDate = new Date(data.payment_date);
-                    const diffTime = paymentDate - bookingDate;
-                    aging = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-                }
-            }
-
-            // ✅ UPDATED: Include collectible_amount
-            const updateQuery = `
-                UPDATE accounts_receivable
-                SET amount_paid = $1,
-                    collectible_amount = $2,  -- ✅ ADDED
-                    payment_date = $3,
-                    terms = $4,
-                    aging = $5,
-                    gross_income = $6,
-                    net_revenue_percentage = $7,
-                    updated_at = NOW()
-                WHERE id = $8
-                RETURNING *;
+        // Calculate aging if payment_date is provided
+        if (data.payment_date) {
+            const bookingQuery = `
+                SELECT created_at FROM bookings
+                WHERE id = (SELECT booking_id FROM accounts_receivable WHERE id = $1)
             `;
+            const bookingResult = await client.query(bookingQuery, [arId]);
 
-            const result = await client.query(updateQuery, [
-                data.amount_paid || 0,
-                data.collectible_amount || data.gross_income || 0,  // ✅ Use collectible_amount or fallback to gross_income
-                data.payment_date || null,
-                data.terms || 0,
-                aging,
-                data.gross_income || 0,
-                data.net_revenue_percentage || 0,
-                arId
-            ]);
-
-            await client.query('COMMIT');
-
-            // Return updated record with joined data
-            return await this.getById(arId);
-        } catch (error) {
-            await client.query('ROLLBACK');
-            throw error;
-        } finally {
-            client.release();
+            if (bookingResult.rows[0]) {
+                const bookingDate = new Date(bookingResult.rows[0].created_at);
+                const paymentDate = new Date(data.payment_date);
+                const diffTime = paymentDate - bookingDate;
+                aging = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            }
         }
+
+        // ✅ UPDATED: Only update non-payment fields
+        // Payment handling is done through transactions in the controller
+        const updateQuery = `
+            UPDATE accounts_receivable
+            SET payment_date = $1,
+                terms = $2,
+                aging = $3,
+                updated_at = NOW()
+            WHERE id = $4
+            RETURNING *;
+        `;
+
+        const result = await client.query(updateQuery, [
+            data.payment_date || null,
+            data.terms || 0,
+            aging,
+            arId
+        ]);
+
+        await client.query('COMMIT');
+
+        // Return updated record with joined data
+        return await this.getById(arId);
+    } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+    } finally {
+        client.release();
     }
+}
+
+// ✅ ADD THIS METHOD: Update collectible_amount when payment transaction is created
+static async deductFromCollectibleAmount(arId, paymentAmount) {
+    const client = await pool.connect();
+
+    try {
+        await client.query('BEGIN');
+
+        // Get current collectible_amount
+        const currentQuery = `
+            SELECT collectible_amount FROM accounts_receivable WHERE id = $1
+        `;
+        const currentResult = await client.query(currentQuery, [arId]);
+        const currentCollectibleAmount = parseFloat(currentResult.rows[0]?.collectible_amount || 0);
+        
+        // Calculate new collectible_amount
+        const newCollectibleAmount = currentCollectibleAmount - paymentAmount;
+
+        // Update collectible_amount
+        const updateQuery = `
+            UPDATE accounts_receivable
+            SET collectible_amount = $1,
+                updated_at = NOW()
+            WHERE id = $2
+            RETURNING *;
+        `;
+
+        const result = await client.query(updateQuery, [newCollectibleAmount, arId]);
+
+        await client.query('COMMIT');
+        return result.rows[0];
+    } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
+// ✅ ADD THIS METHOD: Update amount_paid based on total transactions
+static async updateAmountPaidFromTransactions(arId) {
+    const query = `
+        UPDATE accounts_receivable
+        SET amount_paid = (
+            SELECT COALESCE(SUM(amount), 0) 
+            FROM payment_transactions 
+            WHERE ar_id = $1 AND transaction_type = 'RECEIVABLE'
+        ),
+        updated_at = NOW()
+        WHERE id = $1
+        RETURNING *;
+    `;
+
+    const result = await pool.query(query, [arId]);
+    return result.rows[0];
+}
 
     // ✅ UPDATED: Get AR by booking number with collectible_amount
     static async getByBookingNumber(bookingNumber) {

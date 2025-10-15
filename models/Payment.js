@@ -2,8 +2,13 @@
 import { pool } from "../db/index.js";
 
 class Payment {
-    // Create payment transaction
-    static async createTransaction(data) {
+
+static async createTransaction(data) {
+    const client = await pool.connect();
+    
+    try {
+        await client.query('BEGIN');
+
         const { ar_id, ap_id, transaction_type, amount, payment_date } = data;
         
         const query = `
@@ -12,11 +17,73 @@ class Payment {
             RETURNING *;
         `;
 
-        const result = await pool.query(query, [
+        const result = await client.query(query, [
             ar_id, ap_id, transaction_type, amount, payment_date
         ]);
+
+        // ✅ ADDED: If it's a RECEIVABLE transaction, update AR collectible_amount
+        if (transaction_type === 'RECEIVABLE' && ar_id) {
+            // Deduct from collectible_amount
+            await client.query(`
+                UPDATE accounts_receivable 
+                SET collectible_amount = collectible_amount - $1,
+                    amount_paid = amount_paid + $1,
+                    updated_at = NOW()
+                WHERE id = $2
+            `, [amount, ar_id]);
+        }
+
+        await client.query('COMMIT');
         return result.rows[0];
+    } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+    } finally {
+        client.release();
     }
+}
+
+// ✅ ADD THIS METHOD: Update deleteTransaction to handle AR updates
+static async deleteTransaction(transactionId) {
+    const client = await pool.connect();
+    
+    try {
+        await client.query('BEGIN');
+
+        // First get the transaction details
+        const getQuery = 'SELECT * FROM payment_transactions WHERE id = $1';
+        const transaction = await client.query(getQuery, [transactionId]);
+        
+        if (!transaction.rows[0]) {
+            throw new Error('Transaction not found');
+        }
+
+        const { ar_id, amount, transaction_type } = transaction.rows[0];
+
+        // Delete the transaction
+        const deleteQuery = 'DELETE FROM payment_transactions WHERE id = $1 RETURNING *;';
+        const result = await client.query(deleteQuery, [transactionId]);
+
+        // ✅ ADDED: If it was a RECEIVABLE transaction, add back to collectible_amount
+        if (transaction_type === 'RECEIVABLE' && ar_id) {
+            await client.query(`
+                UPDATE accounts_receivable 
+                SET collectible_amount = collectible_amount + $1,
+                    amount_paid = amount_paid - $1,
+                    updated_at = NOW()
+                WHERE id = $2
+            `, [amount, ar_id]);
+        }
+
+        await client.query('COMMIT');
+        return result.rows[0];
+    } catch (error) {
+        await client.query('ROLLBACK');
+        throw error;
+    } finally {
+        client.release();
+    }
+}
 
     // Get all payment transactions for AR
     static async getByARId(arId) {

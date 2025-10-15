@@ -43,29 +43,30 @@ class Booking {
 
         // Insert into bookings
         const bookingResult = await client.query(
-            `INSERT INTO bookings (
-                user_id, shipping_line_id, ship_id, quantity, booking_mode,
-                commodity, origin_port, destination_port,
-                booking_number, hwb_number
-            )
-            VALUES (
-                $1, $2, $3, $4, $5,
-                $6, $7, $8,
-                'BKG-' || LPAD(nextval('booking_number_seq')::text, 4, '0'),
-                'HWB-' || LPAD(nextval('hwb_number_seq')::text, 4, '0')
-            )
-            RETURNING *`,
-            [
-                user_id,
-                shipping_line_id,
-                ship_id,
-                quantity,
-                booking_mode,
-                commodity,
-                origin_port,
-                destination_port
-            ]
-        );
+  `INSERT INTO bookings (
+      user_id, shipping_line_id, ship_id, quantity, booking_mode,
+      commodity, origin_port, destination_port, booking_date, 
+      booking_number, hwb_number
+  ) VALUES (
+      $1, $2, $3, $4, $5,
+      $6, $7, $8, $9,
+      'BKG-' || LPAD(nextval('booking_number_seq')::text, 4, '0'),
+      'HWB-' || LPAD(nextval('hwb_number_seq')::text, 4, '0')
+  )
+  RETURNING *`,
+  [
+    user_id,
+    shipping_line_id,
+    ship_id,
+    quantity,
+    booking_mode,
+    commodity,
+    origin_port,
+    destination_port,
+    bookingData.booking_date || new Date() // ✅ Add this
+  ]
+);
+
 
         const booking = bookingResult.rows[0];
 

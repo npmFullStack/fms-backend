@@ -34,6 +34,7 @@ class AP {
         
         -- AR financial fields (linked through booking_id)
         ar.gross_income,
+        ar.collectible_amount,
         ar.net_revenue_percentage,
         
         -- Shipping line as freight payee
@@ -165,6 +166,7 @@ class AP {
         
         -- AR financial fields (linked through booking_id)
         ar.gross_income,
+        ar.collectible_amount,
         ar.net_revenue_percentage,
         
         af.amount as freight_amount,
@@ -265,10 +267,11 @@ class AP {
         apId
       ]);
 
-      // Update corresponding AR record with revenue data
+      // ✅ UPDATED: Update corresponding AR record with revenue data including collectible_amount calculation
       const updateARQuery = `
         UPDATE accounts_receivable 
         SET gross_income = $1,
+            collectible_amount = $1 - amount_paid,  -- ✅ Calculate collectible_amount as gross_income minus payments
             net_revenue_percentage = $2,
             updated_at = NOW()
         WHERE booking_id = (
@@ -430,6 +433,7 @@ class AP {
         ap.total_expenses,
         ap.total_payables,
         ar.gross_income,
+        ar.collectible_amount,
         ar.net_revenue_percentage,
         
         af.amount as freight_amount,
