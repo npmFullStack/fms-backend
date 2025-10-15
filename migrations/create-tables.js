@@ -191,7 +191,7 @@ CREATE SEQUENCE IF NOT EXISTS hwb_number_seq START 1;
       payment_status payment_status DEFAULT 'PENDING',
       booking_number VARCHAR(50) UNIQUE,
       hwb_number VARCHAR(50) UNIQUE,
-      booking_date DATE DEFAULT NOW();
+      booking_date DATE DEFAULT NOW(),
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );
