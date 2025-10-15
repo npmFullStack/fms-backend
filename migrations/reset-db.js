@@ -61,7 +61,11 @@ async function resetDatabase() {
       "idx_ap_port_charges_ap_id",
       "idx_ap_port_charges_type",
       "idx_ap_misc_charges_ap_id",
-      "idx_ap_misc_charges_type"
+      "idx_ap_misc_charges_type",
+      "idx_payment_transactions_ar_id",
+      "idx_payment_transactions_ap_id",
+      "idx_payment_transactions_date",
+      "idx_payment_transactions_type"
     ];
 
     for (const idx of indexes) {
@@ -71,6 +75,7 @@ async function resetDatabase() {
     // Drop tables (CASCADE handles dependencies)
     await pool.query(`
       DROP TABLE IF EXISTS 
+      payment_transactions,
         ap_misc_charges,
         ap_port_charges,
         ap_trucking,

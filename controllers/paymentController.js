@@ -1,5 +1,5 @@
 // controllers/paymentController.js
-import { Payment } from "../models/Payment.js";
+import  Payment  from "../models/Payment.js";
 import { createPaymentIntent } from "../utils/paymongoService.js";
 
 export const createPayment = async (req, res) => {

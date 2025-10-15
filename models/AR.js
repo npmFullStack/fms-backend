@@ -2,7 +2,6 @@
 import { pool } from "../db/index.js";
 
 class AR {
-
     // Get AR by booking ID
     static async getByBookingId(bookingId) {
         const query = `
@@ -21,6 +20,7 @@ class AR {
                 ar.id as ar_id,
                 ar.booking_id,
                 ar.amount_paid,
+                ar.collectible_amount,
                 ar.payment_date,
                 ar.terms,
                 ar.aging,
@@ -43,9 +43,6 @@ class AR {
                 -- Shipper info
                 bs.company_name as shipper,
 
-                -- For AR, we need the invoice amount (amount due)
-                -- Since we don't have invoice_amount column, we'll use amount_paid as reference
-                -- You might want to add an 'invoice_amount' column to accounts_receivable table later
                 COALESCE(ar.amount_paid, 0) as paid_amount,
 
                 -- Calculate aging if payment_date exists, otherwise use current date
@@ -56,14 +53,12 @@ class AR {
                         EXTRACT(DAY FROM (NOW() - b.created_at))
                 END as current_aging,
 
-                -- For AR balance, we calculate what's still owed
-                -- Since we don't have invoice_amount, we'll assume the goal is to collect payments
-                -- You might want to add invoice_amount column to track the original amount due
-                (COALESCE(ar.amount_paid, 0)) as current_balance,
+                -- ✅ UPDATED: Calculate outstanding balance using collectible_amount
+                (COALESCE(ar.collectible_amount, ar.gross_income) - COALESCE(ar.amount_paid, 0)) as outstanding_balance,
 
                 -- Payment status based on amount paid
-                -- This needs invoice_amount to be accurate - for now using simple logic
                 CASE
+                    WHEN ar.amount_paid >= COALESCE(ar.collectible_amount, ar.gross_income) THEN 'PAID'
                     WHEN ar.amount_paid > 0 THEN 'PARTIAL'
                     ELSE 'UNPAID'
                 END as ar_payment_status,
@@ -76,10 +71,7 @@ class AR {
                 END as terms_status,
 
                 -- ✅ NEW: Calculate net revenue amount
-                (ar.gross_income * (ar.net_revenue_percentage / 100)) as net_revenue_amount,
-
-                -- ✅ NEW: Calculate outstanding balance using gross_income
-                (COALESCE(ar.gross_income, 0) - COALESCE(ar.amount_paid, 0)) as outstanding_balance
+                (ar.gross_income * (ar.net_revenue_percentage / 100)) as net_revenue_amount
 
             FROM accounts_receivable ar
             INNER JOIN bookings b ON ar.booking_id = b.id
@@ -123,8 +115,8 @@ class AR {
                 -- ✅ NEW: Calculate net revenue amount
                 (ar.gross_income * (ar.net_revenue_percentage / 100)) as net_revenue_amount,
 
-                -- ✅ NEW: Calculate outstanding balance using gross_income
-                (COALESCE(ar.gross_income, 0) - COALESCE(ar.amount_paid, 0)) as outstanding_balance
+                -- ✅ UPDATED: Calculate outstanding balance using collectible_amount
+                (COALESCE(ar.collectible_amount, ar.gross_income) - COALESCE(ar.amount_paid, 0)) as outstanding_balance
 
             FROM accounts_receivable ar
             INNER JOIN bookings b ON ar.booking_id = b.id
@@ -136,7 +128,7 @@ class AR {
         return result.rows[0];
     }
 
-    // Update AR record
+    // ✅ UPDATED: Update AR record with collectible_amount
     static async update(arId, data) {
         const client = await pool.connect();
 
@@ -161,27 +153,29 @@ class AR {
                 }
             }
 
-            // ✅ UPDATED: Include new financial fields
+            // ✅ UPDATED: Include collectible_amount
             const updateQuery = `
                 UPDATE accounts_receivable
                 SET amount_paid = $1,
-                    payment_date = $2,
-                    terms = $3,
-                    aging = $4,
-                    gross_income = $5,
-                    net_revenue_percentage = $6,
+                    collectible_amount = $2,  -- ✅ ADDED
+                    payment_date = $3,
+                    terms = $4,
+                    aging = $5,
+                    gross_income = $6,
+                    net_revenue_percentage = $7,
                     updated_at = NOW()
-                WHERE id = $7
+                WHERE id = $8
                 RETURNING *;
             `;
 
             const result = await client.query(updateQuery, [
                 data.amount_paid || 0,
+                data.collectible_amount || data.gross_income || 0,  // ✅ Use collectible_amount or fallback to gross_income
                 data.payment_date || null,
                 data.terms || 0,
                 aging,
-                data.gross_income || 0,        // ✅ NEW
-                data.net_revenue_percentage || 0, // ✅ NEW
+                data.gross_income || 0,
+                data.net_revenue_percentage || 0,
                 arId
             ]);
 
@@ -197,7 +191,7 @@ class AR {
         }
     }
 
-    // Get AR by booking number or HWB number
+    // ✅ UPDATED: Get AR by booking number with collectible_amount
     static async getByBookingNumber(bookingNumber) {
         const query = `
             SELECT
@@ -208,8 +202,8 @@ class AR {
                 -- ✅ NEW: Calculate net revenue amount
                 (ar.gross_income * (ar.net_revenue_percentage / 100)) as net_revenue_amount,
 
-                -- ✅ NEW: Calculate outstanding balance using gross_income
-                (COALESCE(ar.gross_income, 0) - COALESCE(ar.amount_paid, 0)) as outstanding_balance
+                -- ✅ UPDATED: Calculate outstanding balance using collectible_amount
+                (COALESCE(ar.collectible_amount, ar.gross_income) - COALESCE(ar.amount_paid, 0)) as outstanding_balance
 
             FROM accounts_receivable ar
             INNER JOIN bookings b ON ar.booking_id = b.id
@@ -221,7 +215,7 @@ class AR {
         return result.rows[0];
     }
 
-    // ✅ NEW: Update AR financial fields only (for AP integration)
+    // ✅ UPDATED: Update AR financial fields with collectible_amount
     static async updateFinancialFields(arId, data) {
         const client = await pool.connect();
 
@@ -231,14 +225,16 @@ class AR {
             const updateQuery = `
                 UPDATE accounts_receivable
                 SET gross_income = $1,
-                    net_revenue_percentage = $2,
+                    collectible_amount = $2,  // ✅ ADDED
+                    net_revenue_percentage = $3,
                     updated_at = NOW()
-                WHERE id = $3
+                WHERE id = $4
                 RETURNING *;
             `;
 
             const result = await client.query(updateQuery, [
                 data.gross_income || 0,
+                data.collectible_amount || data.gross_income || 0,  // ✅ Set collectible_amount same as gross_income initially
                 data.net_revenue_percentage || 0,
                 arId
             ]);
@@ -254,13 +250,14 @@ class AR {
         }
     }
 
-    // ✅ NEW: Get AR by booking ID for AP integration
+    // ✅ UPDATED: Get AR by booking ID with collectible_amount
     static async getByBookingIdForAP(bookingId) {
         const query = `
             SELECT 
                 ar.id,
                 ar.booking_id,
                 ar.gross_income,
+                ar.collectible_amount,
                 ar.net_revenue_percentage,
                 ar.amount_paid
             FROM accounts_receivable ar
@@ -271,6 +268,19 @@ class AR {
         return result.rows[0];
     }
 
+    // ✅ NEW: Update collectible_amount only
+    static async updateCollectibleAmount(arId, collectibleAmount) {
+        const query = `
+            UPDATE accounts_receivable
+            SET collectible_amount = $1,
+                updated_at = NOW()
+            WHERE id = $2
+            RETURNING *;
+        `;
+
+        const result = await pool.query(query, [collectibleAmount, arId]);
+        return result.rows[0];
+    }
 }
 
 export default AR;

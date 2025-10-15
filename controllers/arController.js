@@ -51,14 +51,44 @@ export const arController = {
     }
   },
 
-  // ✅ UPDATED: Update AR record with payment transaction
+  // ✅ UPDATED: Update AR record - now handles payments through transactions
   async updateAR(req, res) {
     try {
       const { id } = req.params;
       const validatedData = updateARSchema.parse(req.body);
       
-      // ✅ Check if payment data is provided
+      // ✅ If payment data is provided, create a payment transaction
       if (validatedData.amount_paid && validatedData.payment_date) {
+        // First, get the current AR record to know the gross_income
+        const currentAR = await AR.getById(id);
+        if (!currentAR) {
+          return res.status(404).json({
+            success: false,
+            message: 'AR record not found'
+          });
+        }
+
+        // Create payment transaction (this will automatically update collectible_amount)
+        const transaction = await Payment.createTransaction({
+          ar_id: id,
+          transaction_type: 'RECEIVABLE',
+          amount: parseFloat(validatedData.amount_paid),
+          payment_date: validatedData.payment_date
+        });
+
+        // Get the updated AR record with new collectible_amount
+        const updatedRecord = await AR.getById(id);
+        
+        res.json({
+          success: true,
+          message: 'Payment recorded successfully',
+          data: {
+            transaction,
+            ar_record: updatedRecord
+          }
+        });
+      } else {
+        // ✅ Handle non-payment updates (terms, etc.)
         const updatedRecord = await AR.update(id, validatedData);
         
         if (!updatedRecord) {
@@ -70,50 +100,9 @@ export const arController = {
         
         res.json({
           success: true,
-          message: 'Payment recorded successfully',
+          message: 'AR record updated successfully',
           data: updatedRecord
         });
-      } else {
-        // ✅ Handle updates without payment (like terms update)
-        const client = await pool.connect();
-        try {
-          await client.query('BEGIN');
-          
-          const updateQuery = `
-            UPDATE accounts_receivable 
-            SET terms = COALESCE($1, terms),
-                updated_at = NOW()
-            WHERE id = $2
-            RETURNING *;
-          `;
-          
-          const result = await client.query(updateQuery, [
-            validatedData.terms,
-            id
-          ]);
-          
-          await client.query('COMMIT');
-          
-          if (result.rows.length === 0) {
-            return res.status(404).json({
-              success: false,
-              message: 'AR record not found'
-            });
-          }
-          
-          const updatedRecord = await AR.getById(id);
-          
-          res.json({
-            success: true,
-            message: 'AR record updated successfully',
-            data: updatedRecord
-          });
-        } catch (error) {
-          await client.query('ROLLBACK');
-          throw error;
-        } finally {
-          client.release();
-        }
       }
     } catch (error) {
       console.error('Update AR error:', error);
@@ -134,7 +123,7 @@ export const arController = {
     }
   },
 
-  // ✅ NEW: Get payment transactions for AR record
+  // ✅ UPDATED: Get payment transactions for AR record
   async getPaymentTransactions(req, res) {
     try {
       const { id } = req.params;
@@ -165,7 +154,7 @@ export const arController = {
     }
   },
 
-  // ✅ NEW: Create standalone payment transaction
+  // ✅ UPDATED: Create standalone payment transaction (simplified)
   async createPaymentTransaction(req, res) {
     try {
       const { id } = req.params; // AR ID
@@ -188,7 +177,7 @@ export const arController = {
         });
       }
       
-      // Create payment transaction
+      // ✅ Create payment transaction (this automatically updates collectible_amount)
       const transaction = await Payment.createTransaction({
         ar_id: id,
         transaction_type: 'RECEIVABLE',
@@ -196,29 +185,7 @@ export const arController = {
         payment_date
       });
       
-      // Update AR collectible_amount
-      const totalPaid = await Payment.getTotalPaidForAR(id);
-      const newCollectibleAmount = arRecord.gross_income - totalPaid;
-      
-      const client = await pool.connect();
-      try {
-        await client.query('BEGIN');
-        
-        await client.query(`
-          UPDATE accounts_receivable 
-          SET collectible_amount = $1,
-              updated_at = NOW()
-          WHERE id = $2
-        `, [newCollectibleAmount, id]);
-        
-        await client.query('COMMIT');
-      } catch (error) {
-        await client.query('ROLLBACK');
-        throw error;
-      } finally {
-        client.release();
-      }
-      
+      // Get updated AR record
       const updatedAR = await AR.getById(id);
       
       res.json({
@@ -239,17 +206,24 @@ export const arController = {
     }
   },
 
-  // Delete AR record
+  // ✅ UPDATED: Delete AR record
   async deleteAR(req, res) {
     try {
       const { id } = req.params;
       
-      // First delete related payment transactions
+      // First delete related payment transactions (this handles collectible_amount reset)
       await Payment.deleteTransactionsByARId(id);
       
-      // Then delete AR record
-      const query = 'DELETE FROM accounts_receivable WHERE id = $1';
-      await pool.query(query, [id]);
+      // Then delete AR record using AR model
+      const deleteQuery = 'DELETE FROM accounts_receivable WHERE id = $1';
+      const result = await pool.query(deleteQuery, [id]);
+      
+      if (result.rowCount === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'AR record not found'
+        });
+      }
       
       res.json({
         success: true,
@@ -265,7 +239,7 @@ export const arController = {
     }
   },
 
-  // ✅ NEW: Get AR by booking number or HWB
+  // Get AR by booking number or HWB
   async getARByBookingNumber(req, res) {
     try {
       const { number } = req.params;
@@ -287,6 +261,44 @@ export const arController = {
       res.status(500).json({
         success: false,
         message: 'Failed to fetch AR record',
+        error: error.message
+      });
+    }
+  },
+
+  // ✅ NEW: Delete a specific payment transaction
+  async deletePaymentTransaction(req, res) {
+    try {
+      const { id, transactionId } = req.params;
+      
+      // Verify AR record exists
+      const arRecord = await AR.getById(id);
+      if (!arRecord) {
+        return res.status(404).json({
+          success: false,
+          message: 'AR record not found'
+        });
+      }
+      
+      // Delete the transaction (this automatically updates collectible_amount)
+      const deletedTransaction = await Payment.deleteTransaction(transactionId);
+      
+      // Get updated AR record
+      const updatedAR = await AR.getById(id);
+      
+      res.json({
+        success: true,
+        message: 'Payment transaction deleted successfully',
+        data: {
+          deleted_transaction: deletedTransaction,
+          ar_record: updatedAR
+        }
+      });
+    } catch (error) {
+      console.error('Delete payment transaction error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to delete payment transaction',
         error: error.message
       });
     }
