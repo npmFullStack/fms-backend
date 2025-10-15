@@ -118,6 +118,15 @@ export const updateAPFormSchema = z.object({
     facilitation_amount: z.preprocess(toNumber, z.number().min(0, "Amount must be positive").default(0)),
     facilitation_check_date: z.string().optional().nullable(),
     facilitation_voucher: z.string().optional().nullable(),
+
+    // ✅ NEW: AP Financial Fields (Expenses)
+    bir_percentage: z.preprocess(toNumber, z.number().min(0, "BIR percentage must be positive").max(100, "BIR percentage cannot exceed 100%").default(0)),
+    total_expenses: z.preprocess(toNumber, z.number().min(0, "Total expenses must be positive").default(0)),
+    total_payables: z.preprocess(toNumber, z.number().min(0, "Total payables must be positive").default(0)),
+
+    // ✅ NEW: AR Financial Fields (Revenue) - Linked through booking_id
+    gross_income: z.preprocess(toNumber, z.number().min(0, "Gross income must be positive").default(0)),
+    net_revenue_percentage: z.preprocess(toNumber, z.number().min(0, "Net revenue percentage must be positive").max(100, "Net revenue percentage cannot exceed 100%").default(0)),
 });
 
 export default updateAPFormSchema;

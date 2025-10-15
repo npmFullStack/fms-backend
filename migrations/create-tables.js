@@ -318,9 +318,15 @@ CREATE TABLE IF NOT EXISTS accounts_receivable (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
   amount_paid NUMERIC(12,2) DEFAULT 0,
+  collectible_amount NUMERIC(12,2) DEFAULT 0,  -- ✅ NEW COLUMN (gross_income stays fixed)
   payment_date DATE,
   terms INTEGER DEFAULT 0,
   aging INTEGER DEFAULT 0,
+  
+  -- Revenue calculation fields
+  gross_income NUMERIC(12,2) DEFAULT 0,        -- ✅ STAYS FIXED (total amount)
+  net_revenue_percentage NUMERIC(5,2) DEFAULT 0,
+  
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(booking_id)
@@ -332,9 +338,29 @@ await pool.query(`
   CREATE TABLE IF NOT EXISTS accounts_payable (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+    
+    -- Expense calculation fields
+    bir_percentage NUMERIC(5,2) DEFAULT 0,
+    total_expenses NUMERIC(12,2) DEFAULT 0,
+    total_payables NUMERIC(12,2) DEFAULT 0,
+    
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
   );
+`);
+
+// ================== PAYMENT TRANSACTIONS ====================
+await pool.query(`
+CREATE TABLE IF NOT EXISTS payment_transactions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  ar_id UUID NOT NULL REFERENCES accounts_receivable(id) ON DELETE CASCADE,
+  ap_id UUID REFERENCES accounts_payable(id) ON DELETE SET NULL,
+  transaction_type VARCHAR(20) CHECK (transaction_type IN ('RECEIVABLE',
+  'PAYABLE')) NOT NULL,
+  amount NUMERIC(12,2) NOT NULL,
+  payment_date DATE NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 `);
 
 await pool.query(`
@@ -427,6 +453,12 @@ CREATE INDEX IF NOT EXISTS idx_ar_payment_date ON accounts_receivable(payment_da
 
   CREATE INDEX IF NOT EXISTS idx_ap_misc_charges_ap_id ON ap_misc_charges(ap_id);
   CREATE INDEX IF NOT EXISTS idx_ap_misc_charges_type ON ap_misc_charges(charge_type);
+  
+  CREATE INDEX IF NOT EXISTS idx_payment_transactions_ar_id ON payment_transactions(ar_id);
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_ap_id ON payment_transactions(ap_id);
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_date ON payment_transactions(payment_date);
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_type ON
+payment_transactions(transaction_type);
 `);
 
 

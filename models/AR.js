@@ -24,6 +24,8 @@ class AR {
                 ar.payment_date,
                 ar.terms,
                 ar.aging,
+                ar.gross_income,
+                ar.net_revenue_percentage,
                 ar.created_at,
                 ar.updated_at,
 
@@ -71,7 +73,13 @@ class AR {
                     WHEN ar.terms > 0 AND EXTRACT(DAY FROM (NOW() - b.created_at)) > ar.terms THEN 'OVERDUE'
                     WHEN ar.terms > 0 THEN 'WITHIN_TERMS'
                     ELSE 'NO_TERMS'
-                END as terms_status
+                END as terms_status,
+
+                -- ✅ NEW: Calculate net revenue amount
+                (ar.gross_income * (ar.net_revenue_percentage / 100)) as net_revenue_amount,
+
+                -- ✅ NEW: Calculate outstanding balance using gross_income
+                (COALESCE(ar.gross_income, 0) - COALESCE(ar.amount_paid, 0)) as outstanding_balance
 
             FROM accounts_receivable ar
             INNER JOIN bookings b ON ar.booking_id = b.id
@@ -110,7 +118,13 @@ class AR {
                     WHEN ar.terms > 0 AND EXTRACT(DAY FROM (NOW() - b.created_at)) > ar.terms THEN 'OVERDUE'
                     WHEN ar.terms > 0 THEN 'WITHIN_TERMS'
                     ELSE 'NO_TERMS'
-                END as terms_status
+                END as terms_status,
+
+                -- ✅ NEW: Calculate net revenue amount
+                (ar.gross_income * (ar.net_revenue_percentage / 100)) as net_revenue_amount,
+
+                -- ✅ NEW: Calculate outstanding balance using gross_income
+                (COALESCE(ar.gross_income, 0) - COALESCE(ar.amount_paid, 0)) as outstanding_balance
 
             FROM accounts_receivable ar
             INNER JOIN bookings b ON ar.booking_id = b.id
@@ -147,14 +161,17 @@ class AR {
                 }
             }
 
+            // ✅ UPDATED: Include new financial fields
             const updateQuery = `
                 UPDATE accounts_receivable
                 SET amount_paid = $1,
                     payment_date = $2,
                     terms = $3,
                     aging = $4,
+                    gross_income = $5,
+                    net_revenue_percentage = $6,
                     updated_at = NOW()
-                WHERE id = $5
+                WHERE id = $7
                 RETURNING *;
             `;
 
@@ -163,6 +180,8 @@ class AR {
                 data.payment_date || null,
                 data.terms || 0,
                 aging,
+                data.gross_income || 0,        // ✅ NEW
+                data.net_revenue_percentage || 0, // ✅ NEW
                 arId
             ]);
 
@@ -184,7 +203,13 @@ class AR {
             SELECT
                 ar.*,
                 b.*,
-                bs.company_name as shipper
+                bs.company_name as shipper,
+
+                -- ✅ NEW: Calculate net revenue amount
+                (ar.gross_income * (ar.net_revenue_percentage / 100)) as net_revenue_amount,
+
+                -- ✅ NEW: Calculate outstanding balance using gross_income
+                (COALESCE(ar.gross_income, 0) - COALESCE(ar.amount_paid, 0)) as outstanding_balance
 
             FROM accounts_receivable ar
             INNER JOIN bookings b ON ar.booking_id = b.id
@@ -196,6 +221,55 @@ class AR {
         return result.rows[0];
     }
 
+    // ✅ NEW: Update AR financial fields only (for AP integration)
+    static async updateFinancialFields(arId, data) {
+        const client = await pool.connect();
+
+        try {
+            await client.query('BEGIN');
+
+            const updateQuery = `
+                UPDATE accounts_receivable
+                SET gross_income = $1,
+                    net_revenue_percentage = $2,
+                    updated_at = NOW()
+                WHERE id = $3
+                RETURNING *;
+            `;
+
+            const result = await client.query(updateQuery, [
+                data.gross_income || 0,
+                data.net_revenue_percentage || 0,
+                arId
+            ]);
+
+            await client.query('COMMIT');
+
+            return result.rows[0];
+        } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        } finally {
+            client.release();
+        }
+    }
+
+    // ✅ NEW: Get AR by booking ID for AP integration
+    static async getByBookingIdForAP(bookingId) {
+        const query = `
+            SELECT 
+                ar.id,
+                ar.booking_id,
+                ar.gross_income,
+                ar.net_revenue_percentage,
+                ar.amount_paid
+            FROM accounts_receivable ar
+            WHERE ar.booking_id = $1;
+        `;
+
+        const result = await pool.query(query, [bookingId]);
+        return result.rows[0];
+    }
 
 }
 
