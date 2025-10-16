@@ -363,7 +363,7 @@ CREATE TABLE IF NOT EXISTS payment_transactions (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 `);
-
+//wowwers!!!
 await pool.query(`
   CREATE TABLE IF NOT EXISTS ap_freight (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
