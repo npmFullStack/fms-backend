@@ -107,6 +107,19 @@ class Courier {
         );
         return result.rows;
     }
+    
+ 
+static async addIncident({ imageUrl, description, bookingId, totalCost }) {
+  const result = await pool.query(
+    `INSERT INTO incidents (image_url, type, description, booking_id, total_cost)
+     VALUES ($1, 'LAND', $2, $3, $4)
+     RETURNING *`,
+    [imageUrl, description, bookingId, totalCost]
+  );
+  return result.rows[0];
+}
+
+
 }
 
 export default Courier;
