@@ -19,6 +19,8 @@ import paymentRoutes from "./routes/paymentRoutes.js";
 import webhookRoutes from "./routes/webhookRoutes.js";
 import arRoutes from "./routes/arRoutes.js";
 import apRoutes from "./routes/apRoutes.js";
+import incidentRoutes from "./routes/incidentRoutes.js";
+
 
 const app = express();
 
@@ -51,6 +53,7 @@ app.use("/notifications", notificationRoutes);
 app.use("/payments", paymentRoutes);
 app.use("/ap", apRoutes);
 app.use("/ar", arRoutes);
+app.use("/incidents", incidentRoutes);
 
 // Health check
 app.get("/health", (req, res) => {

@@ -16,7 +16,7 @@ export const bookingSchema = z.object({
     consignee: z.string().min(1, "Consignee is required"),
     consignee_name: z.string().optional().nullable(),
     consignee_phone: z.string().optional().nullable(),
-booking_date: z.string().optional().or(z.literal("")),
+booking_date: z.string().min(1, "Booking date is required"),
 
     shipping_line_id: z.string().uuid(),
     ship_id: z.string().uuid().optional().nullable(),

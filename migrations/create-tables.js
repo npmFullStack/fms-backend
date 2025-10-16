@@ -52,6 +52,10 @@ CREATE TYPE booking_status AS ENUM (
 );
 END IF;
 
+IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'incident_type') THEN
+  CREATE TYPE incident_type AS ENUM ('SEA', 'LAND');
+END IF;
+
 IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'paymongo_status') THEN
 CREATE TYPE paymongo_status AS ENUM (
   'PENDING',
@@ -427,6 +431,21 @@ await pool.query(`
   );
 `);
   
+  
+  // ==================== INCIDENTS ======================
+await pool.query(`
+CREATE TABLE IF NOT EXISTS incidents (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  image_url TEXT,
+  type incident_type NOT NULL,
+  description TEXT NOT NULL,
+  total_cost NUMERIC(12,2) DEFAULT 0,
+  booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+`);
+
 // ==================== INDEXES ====================
 await pool.query(`
   -- Existing
@@ -460,6 +479,7 @@ CREATE INDEX IF NOT EXISTS idx_payment_transactions_ap_id ON payment_transaction
 CREATE INDEX IF NOT EXISTS idx_payment_transactions_date ON payment_transactions(payment_date);
 CREATE INDEX IF NOT EXISTS idx_payment_transactions_type ON
 payment_transactions(transaction_type);
+CREATE INDEX IF NOT EXISTS idx_incidents_booking_id ON incidents(booking_id);
 `);
 
 
@@ -614,7 +634,8 @@ const tablesForTrigger = [
   "ap_freight",
   "ap_trucking",
   "ap_port_charges",
-  "ap_misc_charges"
+  "ap_misc_charges",
+  "incidents"
 ];
 
 for (const t of tablesForTrigger) {
